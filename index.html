@@ -193,6 +193,7 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
 .selo{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;padding:3px 8px;border-radius:999px}
 .selo.prov{color:var(--rust);border:1px solid var(--rust)}
 .selo.def{color:#2E7D5B;border:1px solid #2E7D5B}
+.selo.folha{color:var(--f4);border:1px solid var(--f4)}
 
 /* ---------- botões ---------- */
 .btn{
@@ -822,24 +823,28 @@ async function renderLicao(){
 }
 
 function cartaoMaterial(m){
+  const trocavel = !!m.prompt_imagem;      // só ilustração aceita arte externa
   const def = m.imagem_status === 'definitivo' && m.imagem_url;
   return `<div class="mat">
     <div class="cab">
       <span class="tipo">${esc(m.tipo)}</span>
       <span class="tit">${esc(m.titulo)}</span>
-      <span class="selo ${def ? 'def' : 'prov'}">${def ? 'Definitivo' : 'Provisório'}</span>
+      ${trocavel ? `<span class="selo ${def ? 'def' : 'prov'}">${def ? 'Definitivo' : 'Provisório'}</span>`
+                 : '<span class="selo folha">Folha</span>'}
     </div>
     <div class="prev">${def ? `<img src="${esc(m.imagem_url)}" alt="${esc(m.titulo)}">`
                             : (m.svg || '<span style="color:var(--ink-soft);font-size:13px">sem prévia</span>')}</div>
     ${m.instrucoes ? `<div style="padding:10px 14px;font-size:13px;color:var(--ink-soft)">${esc(m.instrucoes)}</div>` : ''}
-    ${estado.papel === 'admin' ? `<div class="pe">
-      ${m.prompt_imagem ? `<button class="btn ghost sm" data-copiar="${esc(m.prompt_imagem)}">Copiar prompt</button>` : ''}
+    ${estado.papel === 'admin' ? (trocavel ? `<div class="pe">
+      <button class="btn ghost sm" data-copiar="${esc(m.prompt_imagem)}">Copiar prompt</button>
       <label class="btn ghost sm" style="cursor:pointer">
         ${def ? 'Trocar arte' : 'Enviar arte final'}
         <input type="file" accept="image/png,image/jpeg,image/webp"
                class="oculto" data-enviar="${m.id}">
       </label>
-    </div>` : ''}
+    </div>` : `<div class="pe" style="font-size:12.5px;color:var(--ink-soft)">
+      Folha de atividade — o texto faz parte do exercício, então ela não é
+      substituída por arte externa.</div>`) : ''}
   </div>`;
 }
 
@@ -1171,31 +1176,51 @@ FAIXA: ${faixa.nome} — ${s.idade}
 LIÇÃO: ${licao.tema}
 TEXTO: ${u.texto_biblico}
 VERDADE CENTRAL: ${u.verdade_central}
+VERSÍCULO: ${licao.versiculo_texto || ''} (${licao.versiculo_ref || ''})
 ATIVIDADE DE FIXAÇÃO PREVISTA: ${licao.atividade_fixacao}
 MATERIAIS TÍPICOS DESTA IDADE: ${s.materiais}
 
-Produza de 2 a 3 materiais.
+São dois tipos de material, com finalidades diferentes. Produza UMA ilustração e
+uma ou duas folhas.
 
-O SVG deve ser completo e autossuficiente, com viewBox="0 0 560 760" (proporção A4
-em pé), traço preto (#111), stroke-width entre 3 e 5, fill="none" ou "#fff", formas
-grandes e bem separadas para caber giz de cera. Sem <image>, sem <script>, sem fontes
-externas, sem gradiente. Texto apenas com <text> em família sans-serif. Isto é arte
-provisória: priorize clareza geométrica, não beleza. Mantenha cada SVG enxuto — no
-máximo 40 elementos. É melhor um desenho simples e completo que um elaborado e cortado.
+── ILUSTRAÇÃO ──
+Uma cena para a criança colorir. SEM NENHUM TEXTO dentro do desenho: nem título, nem
+versículo, nem legenda. Só a cena. É ela que depois será substituída por uma arte
+definitiva feita em IA de imagem, e por isso não pode carregar informação escrita.
+O campo PROMPT descreve essa cena para a IA de imagem.
 
-O PROMPT é a instrução, em português, para gerar a arte definitiva numa IA de imagem.
-Descreva a cena e diga que é desenho de linha preto e branco para colorir, traço grosso
-e contínuo, sem sombreado, sem hachura, fundo branco, áreas amplas, proporção A4 em pé,
-adequado a criança de ${s.idade}.
+── FOLHA ──
+A folha de atividade propriamente dita: título, comando, perguntas, linhas para
+escrever, espaços para desenhar, jogo. É AQUI que mora o conteúdo didático — o texto
+é essencial e não pode faltar. A folha nunca é substituída por arte externa, então
+NÃO escreva PROMPT nela.
 
-Responda EXATAMENTE neste formato de texto puro, repetindo o bloco para cada material.
-Não use JSON, não use cercas de código, não escreva nada antes ou depois.
+Regras do SVG (vale para os dois): completo e autossuficiente, viewBox="0 0 560 760"
+(A4 em pé), traço preto (#111), stroke-width entre 3 e 5, fill="none" ou "#fff".
+Sem <image>, sem <script>, sem fontes externas, sem gradiente. Texto apenas com <text>
+em família sans-serif. Máximo de 40 elementos por desenho — melhor simples e completo
+que elaborado e cortado. Rodapé de cada folha: "Igreja Vidas — Departamento Infantil".
+
+Responda EXATAMENTE neste formato de texto puro. Não use JSON, não use cercas de
+código, não escreva nada antes ou depois.
 
 ===MATERIAL===
-TIPO: um entre colorir, dobradura, colagem, jogo, cartao, folha, recortavel, mapa
+CLASSE: ilustracao
+TIPO: colorir
 TITULO: nome curto
 INSTRUCOES: o que o professor faz com esta folha
-PROMPT: instrução para a IA de imagem
+PROMPT: descrição da cena para a IA de imagem. Diga que é desenho de linha preto e
+branco para colorir, traço grosso e contínuo, sem sombreado, sem hachura, fundo branco,
+áreas amplas, proporção A4 em pé, adequado a criança de ${s.idade}, e SEM NENHUM TEXTO
+ou letra na imagem.
+SVG:
+<svg viewBox="0 0 560 760" xmlns="http://www.w3.org/2000/svg">...</svg>
+===FIM===
+===MATERIAL===
+CLASSE: folha
+TIPO: um entre folha, jogo, recortavel, colagem, dobradura, cartao, mapa
+TITULO: nome curto
+INSTRUCOES: o que o professor faz com esta folha
 SVG:
 <svg viewBox="0 0 560 760" xmlns="http://www.w3.org/2000/svg">...</svg>
 ===FIM===`;
@@ -1220,11 +1245,14 @@ function lerMateriais(txt){
     }
     const titulo = campo('TITULO');
     if (!titulo && !svg) continue;
+    const ilustracao = /ilustra/i.test(campo('CLASSE'));
     saida.push({
-      tipo: (campo('TIPO') || 'folha').toLowerCase().split(/[\s,]/)[0],
+      tipo: (campo('TIPO') || (ilustracao ? 'colorir' : 'folha')).toLowerCase().split(/[\s,]/)[0],
       titulo: titulo || 'Material',
       instrucoes: campo('INSTRUCOES'),
-      prompt_imagem: campo('PROMPT'),
+      // Só a ilustração pode ser trocada por arte externa. Uma folha de
+      // atividade carrega o conteúdo didático e não se substitui por imagem.
+      prompt_imagem: ilustracao ? campo('PROMPT') : null,
       svg
     });
   }
