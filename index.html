@@ -254,6 +254,15 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
   .tab-grade td,.tab-grade tr.sub td{padding-left:10px;padding-right:10px}
 }
 
+/* ---------- fila de geração ---------- */
+.barra{height:6px;background:var(--line);border-radius:999px;overflow:hidden;margin:18px 0 12px}
+.barra > div{height:100%;width:0;background:var(--gold);transition:width .3s ease}
+.registro{
+  background:var(--f5);color:#BFD0E4;border-radius:var(--r);padding:16px;
+  font-family:var(--mono);font-size:12px;line-height:1.7;
+  max-height:340px;overflow:auto;white-space:pre-wrap;margin:0;
+}
+
 /* ---------- utilidades ---------- */
 .aviso{
   background:#FBF6E6;border:1px solid #E6D8A8;border-left:3px solid var(--gold);
@@ -292,7 +301,11 @@ const CONFIG = {
   // Portaria por PIN. Não é segurança criptográfica: é para o material
   // certo chegar à turma certa e ninguém disparar geração por engano.
   PIN_ADMIN: '1988',
-  PIN_FAIXA: { bercario:'1111', maternal:'2222', jardim:'3333', primarios:'4444', juniores:'5555' }
+  PIN_FAIXA: { bercario:'1111', maternal:'2222', jardim:'3333', primarios:'4444', juniores:'5555' },
+
+  // Motor de geração (Cloudflare Worker — veja worker.js)
+  WORKER_URL: 'https://SEU-WORKER.workers.dev',
+  MODELO: 'claude-sonnet-4-6'
 };
 
 /* =================================================================== */
@@ -333,10 +346,113 @@ const CAMPOS_FICHA = [
   ['oracao','Oração','14']
 ];
 
-/* =================================================================== */
-let sb = null;
+/* ===================================================================
+   PERFIL TEOLÓGICO — vai no system prompt de toda geração.
+   Fonte: "Perfil Teológico Pessoal", seção 20, com guarda-corpo da
+   Declaração Doutrinária da CBB para os pontos deixados em aberto.
+   =================================================================== */
+const PERFIL = `Você escreve material do Departamento Infantil da Igreja Vidas, sob a
+referência teológica do bispo responsável pelo currículo.
+
+REFERÊNCIA TEOLÓGICA
+Linha evangélica, bíblica e cristocêntrica, de forte afinidade batista e perspectiva
+continuísta quanto aos dons do Espírito Santo. Hermenêutica histórico-gramatical,
+respeitando contexto histórico, cultural, literário, gramatical e canônico. Alta visão
+da autoridade das Escrituras, centralidade de Cristo, salvação pela graça mediante a fé,
+batismo de crentes por imersão, valorização da igreja local, discipulado, células,
+formação de líderes, evangelismo e missão. Escatologia amilenista: o milênio de
+Apocalipse 20 é lido simbolicamente, a segunda vinda será pessoal e visível, e a
+esperança culmina em novos céus e nova terra.
+
+O QUE EVITAR
+- Sensacionalismo e leitura de notícias atuais como cumprimento de símbolos proféticos.
+- Texto fora de contexto e doutrina construída sobre frase isolada.
+- Teologia da prosperidade.
+- Afirmação dogmática em debates secundários: os cinco pontos do calvinismo, os artigos
+  do arminianismo, cronologias escatológicas detalhadas. Nesses temas, ensine o consenso
+  cristão, apresente as diferenças com justiça e sem caricatura.
+- Forçar Jesus artificialmente em cada detalhe do texto. A leitura é cristocêntrica no
+  sentido de situar a passagem na história da redenção, não de alegorizar.
+- Moralismo: a lição não termina em "seja bonzinho", e sim na graça que transforma.
+
+DOUTRINA DE REFERÊNCIA (Declaração Doutrinária da CBB, resumida)
+Bíblia: Palavra de Deus, autoridade única em matéria de fé, interpretada à luz de Cristo.
+Deus: um só, eterno, santo, criador, revelado como Pai, Filho e Espírito Santo.
+Jesus: verdadeiro Deus e verdadeiro homem, nascido de virgem, morto e ressuscitado
+corporalmente, único mediador, voltará visivelmente.
+Espírito Santo: pessoa divina, regenera, habita, guia e distribui dons para edificar a igreja.
+Ser humano: criado à imagem de Deus, com dignidade e responsabilidade; pecador e
+necessitado da graça.
+Salvação: pela graça mediante a fé, produzindo arrependimento, nova vida e obediência.
+Igreja: comunidade local de regenerados e batizados por imersão; batismo e Ceia são
+ordenanças, não meios de salvação.
+
+PRINCÍPIO PEDAGÓGICO DO CURRÍCULO
+O mesmo texto bíblico atravessa cinco faixas etárias no mesmo domingo. Muda a
+profundidade, a linguagem, a metodologia e o resultado esperado — nunca a verdade central.
+
+REGRA DE ESCRITA
+Português do Brasil. Linguagem calorosa e concreta, adequada à idade indicada. Nada de
+jargão teológico não explicado. Nunca invente citação bíblica: use apenas o texto que
+lhe for fornecido.`;
+
+/* Especificação pedagógica de cada faixa, extraída do currículo oficial. */
+const FAIXA_SPEC = {
+  bercario:{
+    idade:'0 a 1 ano e 11 meses', verbo:'Perceber', duracao:'30 a 40 minutos',
+    como:`Não são aulas, e sim EXPERIÊNCIAS ESPIRITUAIS REPETIDAS. A mesma experiência
+se repete nos quatro domingos do bloco. História de 2 a 3 minutos, no máximo. Frases
+curtas repetidas muitas vezes. Música com gestos, fantoche, figuras grandes, texturas,
+sons, espelho, cesto sensorial, colo e afeto.`,
+    resultado:`A criança associa Deus, Jesus, a Bíblia, a oração e a Igreja a algo bom e seguro.`,
+    memorizacao:'Uma frase de 3 a 5 palavras, repetida ("Deus ama você").',
+    materiais:'Figura grande e simples para colorir com o auxílio do adulto; cartão de textura; máscara ou fantoche de dobradura simples.'
+  },
+  maternal:{
+    idade:'2 a 3 anos', verbo:'Conhecer', duracao:'40 a 50 minutos',
+    como:`A palavra-chave é REPETIÇÃO: a criança aprende ouvindo, vendo, fazendo e
+repetindo. Pintura com dedos, massinha, colagem, quebra-cabeça simples, fantoche,
+dramatização curta, música com movimento, caixa surpresa, jogo de associação, cartões.`,
+    resultado:'A criança nomeia a verdade da lição com suas próprias palavras.',
+    memorizacao:'Versículo muito curto, de no máximo 8 palavras.',
+    materiais:'Desenho para colorir com traço grosso; colagem simples; jogo de associação recortável.'
+  },
+  jardim:{
+    idade:'4 a 5 anos', verbo:'Compreender', duracao:'50 a 60 minutos',
+    como:`A criança saiu do "o que aconteceu?" para o "por quê?". Responda ao porquê.
+Pintura, recorte e colagem, labirinto, ligue os pontos, teatro, fantoche, jogo bíblico,
+memorização com gestos, quebra-cabeça, sequência de acontecimentos, verdadeiro ou falso,
+caça ao personagem, bingo bíblico.`,
+    resultado:'A criança relaciona a verdade bíblica a uma situação do seu cotidiano.',
+    memorizacao:'Versículo curto, com gestos.',
+    materiais:'Desenho para colorir; labirinto ou ligue os pontos ligado à história; tira de sequência de acontecimentos para recortar e ordenar.'
+  },
+  primarios:{
+    idade:'6 a 8 anos', verbo:'Aplicar', duracao:'60 a 70 minutos',
+    como:`Transição da história bíblica para o ESTUDO bíblico, no encadeamento
+personagem → acontecimento → princípio → aplicação. A criança manuseia a própria Bíblia:
+inclua localização de texto. Corrida bíblica, quiz, dramatização, projeto, diário de
+oração, mapa missionário.`,
+    resultado:'A criança identifica o princípio do texto e nomeia uma atitude concreta para a semana.',
+    memorizacao:'Versículo completo, com referência.',
+    materiais:'Desenho para colorir ou ilustrar; jogo de perguntas ou caça-palavras do tema; folha de atividade com localização de versículos.'
+  },
+  juniores:{
+    idade:'9 a 11 anos', verbo:'Convicção', duracao:'60 a 75 minutos',
+    como:`Reduza drasticamente pintura. Eles precisam ler, perguntar, interpretar,
+conversar, argumentar, decidir e aplicar. Use o método O.P.A. — Observar (o que está
+escrito?), Pensar (o que significa?), Aplicar (o que devo fazer?). Quiz, debate, estudo
+de caso, pesquisa, linha do tempo, mapa bíblico, desafio semanal, diário devocional,
+Caixa das Grandes Perguntas. Trate dúvidas reais com honestidade, sem respostas prontas.`,
+    resultado:'O pré-adolescente formula com as próprias palavras o que crê e por quê.',
+    memorizacao:'Versículo com referência e uma frase sobre o contexto.',
+    materiais:'Folha de estudo O.P.A.; estudo de caso impresso; linha do tempo, mapa ou quiz para recortar.'
+  }
+};
 const configurado = () => CONFIG.SUPABASE_URL.includes('supabase.co') && !CONFIG.SUPABASE_URL.includes('SEU-PROJETO');
 if (configurado()) sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+const sbBiblia = createClient(CONFIG.BIBLIA.URL, CONFIG.BIBLIA.KEY,
+                              { db:{ schema: CONFIG.BIBLIA.SCHEMA } });
 
 const estado = {
   papel: localStorage.getItem('rc_papel') || null,     // 'admin' | 'professor'
@@ -441,6 +557,7 @@ async function renderInicio(){
     ${estado.papel === 'admin' ? `
       <div class="linha" style="margin-top:26px">
         <button class="btn" data-ir="grade">Grade dos 52 domingos</button>
+        <button class="btn gold" data-ir="gerar">Gerar material</button>
         <button class="btn ghost" data-ir="moldes">Banco de moldes</button>
       </div>` : ''}
   `);
@@ -453,16 +570,23 @@ async function renderFaixa(){
   const unidades = await carregarUnidades();
   const t = TRIMESTRES.find(t => t.id === estado.trimestre);
 
-  const doTri = unidades.filter(u =>
+  let doTri = unidades.filter(u =>
     u.tipo === 'ciclo' && u.numero >= t.faixa[0] && u.numero <= t.faixa[1]);
+  // O Berçário tem uma lição por bloco de quatro domingos.
+  if (f.id === 1) doTri = doTri.filter(u => faixasDaUnidade(u).includes(1));
   const extras = unidades.filter(u => u.tipo === 'extra');
 
   const cartao = u => {
     const l = (u.licoes || []).find(x => x.faixa_id === f.id);
     const st = l?.status || 'pendente';
-    const rot = u.tipo === 'extra'
+    let rot = u.tipo === 'extra'
       ? (EXTRAS.find(e => e.slug === u.extra_slug)?.nome || 'Extra').toUpperCase()
       : `Domingo ${pad(u.numero)}`;
+    if (f.id === 1 && u.tipo === 'ciclo'){
+      const pos = u.numero - t.faixa[0];
+      rot = pos === 12 ? `Domingo ${pad(u.numero)} · revisão`
+                       : `Domingos ${pad(u.numero)}–${pad(u.numero+3)}`;
+    }
     return `<button class="card ${u.tipo === 'extra' ? 'extra' : ''}"
               data-ir="licao" data-arg="${u.id}">
       <span class="num">${esc(rot)}<span class="dot ${st}" title="${st}"></span></span>
@@ -595,9 +719,28 @@ async function renderLicao(){
                   lição, na etapa de geração.</p></div>`}
         <button class="btn ghost" style="width:100%;margin-top:8px" disabled>
           Baixar tudo em PDF — etapa 4</button>
+        ${estado.papel === 'admin' ? `
+          <div class="bloco" style="margin-top:14px">
+            <h3 data-n="${pad(l.versao || 1)}">Situação da lição</h3>
+            <p style="margin-bottom:12px;color:var(--ink-soft);font-size:13.5px">
+              ${l.status === 'gerada' ? 'Gerada, aguardando sua revisão.'
+              : l.status === 'aprovada' ? 'Aprovada. Publique para liberar ao professor.'
+              : 'Publicada — o professor da faixa já vê este material.'}</p>
+            <div class="linha" style="margin:0">
+              ${l.status === 'gerada' ? '<button class="btn gold sm" data-acao="aprovada">Aprovar</button>' : ''}
+              ${l.status === 'aprovada' ? '<button class="btn gold sm" data-acao="publicada">Publicar</button>' : ''}
+              ${l.status === 'publicada' ? '<button class="btn ghost sm" data-acao="aprovada">Despublicar</button>' : ''}
+              <button class="btn ghost sm" data-regerar="${l.id}">Regerar</button>
+            </div>
+          </div>` : ''}
       </aside>
     </div>`, migalhas);
 
+  app.querySelectorAll('[data-acao]').forEach(b => {
+    b.onclick = () => mudarStatus(l.id, b.dataset.acao);
+  });
+  const btnReg = app.querySelector('[data-regerar]');
+  if (btnReg) btnReg.onclick = () => regerarLicao(l.id, u.id, f.id);
   app.querySelectorAll('[data-copiar]').forEach(b => {
     b.onclick = async () => {
       await navigator.clipboard.writeText(b.dataset.copiar);
@@ -804,6 +947,358 @@ async function carregarMateriais(licaoId){
   return data || [];
 }
 
+/* ===================================================================
+   MOTOR DE GERAÇÃO
+   =================================================================== */
+
+/* --- texto bíblico (Bíblia Livre, domínio público) --- */
+let LIVROS_BIBLIA = null;
+const normalizar = s => String(s||'').toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s.]+/g,'');
+
+async function livrosBiblia(){
+  if (LIVROS_BIBLIA) return LIVROS_BIBLIA;
+  const { data, error } = await sbBiblia.from('livros').select('*').order('ordem_canonica');
+  if (error) throw new Error('Banco bíblico: ' + error.message);
+  LIVROS_BIBLIA = data || [];
+  return LIVROS_BIBLIA;
+}
+
+/* "Gênesis 1.26-31; 2.7" → [{livro, cap, vIni, vFim}, ...] */
+function lerReferencia(ref, livros){
+  const partes = String(ref).split(';').map(p => p.trim()).filter(Boolean);
+  const saida = []; let ultimo = null;
+
+  for (const parte of partes){
+    let m = parte.match(/^(.+?)\s+(\d+)(?:[.:](\d+)(?:\s*[-–]\s*(\d+))?)?$/);
+    let nome, cap, v1, v2;
+    if (m && !/^\d/.test(m[1].trim().replace(/^[1-3]\s*/,''))){
+      nome = m[1].trim(); cap = +m[2]; v1 = m[3] ? +m[3] : null; v2 = m[4] ? +m[4] : null;
+    } else {
+      m = parte.match(/^(\d+)[.:](\d+)(?:\s*[-–]\s*(\d+))?$/);
+      if (!m || !ultimo) continue;
+      nome = ultimo.nome; cap = +m[1]; v1 = +m[2]; v2 = m[3] ? +m[3] : null;
+    }
+    const alvo = normalizar(nome);
+    const livro = livros.find(l => normalizar(l.nome) === alvo)
+               || livros.find(l => normalizar(l.abrev) === alvo)
+               || livros.find(l => normalizar(l.nome).startsWith(alvo));
+    if (!livro) throw new Error(`Livro não encontrado na referência "${parte}".`);
+    ultimo = { nome };
+    saida.push({ livro, cap, vIni: v1, vFim: v2 || v1 });
+  }
+  if (!saida.length) throw new Error(`Referência não compreendida: "${ref}".`);
+  return saida;
+}
+
+async function buscarPassagem(ref){
+  const livros = await livrosBiblia();
+  const trechos = lerReferencia(ref, livros);
+  const blocos = [];
+  for (const t of trechos){
+    let q = sbBiblia.from('versiculos').select('versiculo,texto')
+      .eq('versao_id', CONFIG.BIBLIA.VERSAO_ID)
+      .eq('livro_id', t.livro.id).eq('capitulo', t.cap);
+    if (t.vIni) q = q.gte('versiculo', t.vIni).lte('versiculo', t.vFim);
+    const { data, error } = await q.order('versiculo');
+    if (error) throw new Error('Banco bíblico: ' + error.message);
+    if (!data?.length) throw new Error(`Sem texto para ${t.livro.nome} ${t.cap}.`);
+    blocos.push(`${t.livro.nome} ${t.cap}\n` +
+      data.map(v => `${v.versiculo}. ${v.texto}`).join('\n'));
+  }
+  return blocos.join('\n\n');
+}
+
+/* --- chamada ao motor --- */
+async function chamarIA(system, prompt, maxTokens){
+  const r = await fetch(CONFIG.WORKER_URL, {
+    method:'POST', headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ pin: CONFIG.PIN_ADMIN, system, prompt,
+                           max_tokens: maxTokens, model: CONFIG.MODELO })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || `Motor de geração respondeu ${r.status}.`);
+  if (!d.texto) throw new Error('O motor devolveu uma resposta vazia.');
+  return d.texto;
+}
+
+function extrairJSON(txt){
+  let t = txt.trim().replace(/^```(?:json)?/i,'').replace(/```$/,'').trim();
+  const i = t.indexOf('{'), f = t.lastIndexOf('}');
+  if (i === -1 || f === -1) throw new Error('A resposta não veio em JSON.');
+  return JSON.parse(t.slice(i, f+1));
+}
+
+/* --- quais lições cada unidade exige --- */
+function faixasDaUnidade(u){
+  if (u.tipo === 'extra') return FAIXAS.map(f => f.id);
+  const t = TRIMESTRES.find(x => u.numero >= x.faixa[0] && u.numero <= x.faixa[1]);
+  const pos = u.numero - t.faixa[0];             // 0..12
+  const cabecaDeBloco = pos % 4 === 0 && pos < 12;
+  const revisao = pos === 12;
+  // O Berçário só recebe lição na abertura do bloco e na revisão:
+  // nos outros três domingos a turma repete a mesma experiência.
+  return (cabecaDeBloco || revisao) ? [1,2,3,4,5] : [2,3,4,5];
+}
+
+/* --- prompts --- */
+function promptLicao(u, faixa, passagem, tema){
+  const s = FAIXA_SPEC[faixa.slug];
+  return `Escreva a lição de um domingo para uma turma do Departamento Infantil.
+
+TRIMESTRE: ${tema}
+UNIDADE: ${u.titulo}
+TEXTO BÍBLICO: ${u.texto_biblico}
+VERDADE CENTRAL (comum às cinco faixas, não a altere): ${u.verdade_central}
+
+FAIXA: ${faixa.nome} — ${s.idade}
+VERBO PEDAGÓGICO: ${s.verbo}
+PERGUNTA PREDOMINANTE DA IDADE: "${faixa.pergunta}"
+DURAÇÃO: ${s.duracao}
+COMO ENSINAR NESTA IDADE: ${s.como}
+RESULTADO ESPERADO: ${s.resultado}
+MEMORIZAÇÃO: ${s.memorizacao}
+
+TEXTO BÍBLICO (Bíblia Livre, domínio público — use somente este texto):
+${passagem}
+
+Responda APENAS com um objeto JSON, sem comentários e sem cercas de código:
+{
+ "tema": "título da lição para esta faixa",
+ "objetivo": "uma frase: o que a criança deve alcançar",
+ "versiculo_ref": "referência do versículo de memorização, dentro da passagem acima",
+ "versiculo_texto": "o versículo conforme o texto fornecido",
+ "chave_metodologica": "uma frase com a ideia didática que sustenta esta aula",
+ "duracao": "${s.duracao}",
+ "recursos_didaticos": ["item", "item", "item"],
+ "preparacao_professor": "o que o professor prepara antes, inclusive espiritualmente",
+ "acolhimento": "como receber as crianças (2 a 4 frases)",
+ "introducao": "quebra-gelo ou gancho que abre o tema",
+ "ensino_biblico": "o ensino propriamente dito, já na linguagem da idade; para as faixas menores, a história contada; para as maiores, o estudo com contexto",
+ "atividade_fixacao": "atividade que fixa a verdade central",
+ "aplicacao_pratica": "como isso toca a vida da criança nesta semana",
+ "oracao": "orientação de oração, com uma oração sugerida",
+ "desafio_semana": "um desafio pessoal para a criança",
+ "desafio_familia": "atividade curta enviada aos pais para a semana",
+ "orientacoes_professor": ["cuidado ou dica prática", "outra", "outra"]
+}`;
+}
+
+function promptMateriais(u, faixa, licao){
+  const s = FAIXA_SPEC[faixa.slug];
+  return `Crie os materiais impressos desta lição.
+
+FAIXA: ${faixa.nome} — ${s.idade}
+LIÇÃO: ${licao.tema}
+TEXTO: ${u.texto_biblico}
+VERDADE CENTRAL: ${u.verdade_central}
+ATIVIDADE DE FIXAÇÃO PREVISTA: ${licao.atividade_fixacao}
+MATERIAIS TÍPICOS DESTA IDADE: ${s.materiais}
+
+Produza de 2 a 3 materiais. Para cada um:
+
+- "svg": desenho completo e autossuficiente, começando em <svg e terminando em </svg>,
+  com viewBox="0 0 560 760" (proporção A4 em pé). Traço preto (#111), stroke-width entre
+  3 e 5, fill="none" ou "#fff", formas grandes e bem separadas para caber giz de cera.
+  Sem <image>, sem <script>, sem fontes externas, sem gradiente. Texto só com <text> em
+  família sans-serif. Isto é arte provisória: priorize clareza geométrica sobre beleza.
+- "prompt_imagem": instrução em português para gerar a arte definitiva em uma IA de
+  imagem. Descreva a cena, diga que é desenho de linha preto e branco para colorir,
+  traço grosso e contínuo, sem sombreado, sem hachura, fundo branco, áreas amplas,
+  proporção A4 em pé, adequado a criança de ${s.idade}.
+
+Responda APENAS com um objeto JSON, sem comentários e sem cercas de código:
+{ "materiais": [
+  { "tipo": "colorir|dobradura|colagem|jogo|cartao|folha|recortavel|mapa",
+    "titulo": "nome curto",
+    "instrucoes": "o que o professor faz com esta folha",
+    "svg": "<svg ...>...</svg>",
+    "prompt_imagem": "..." }
+]}`;
+}
+
+/* --- geração de uma lição --- */
+async function gerarLicao(u, faixa, registrar){
+  const tema = TRIMESTRES.find(t => t.id === u.trimestre_id)?.tema || '';
+  registrar(`${u.tipo === 'extra' ? 'Extra' : 'Domingo ' + pad(u.numero)} · ${faixa.nome}: buscando o texto`);
+  const passagem = await buscarPassagem(u.texto_biblico);
+
+  registrar(`${u.tipo === 'extra' ? 'Extra' : 'Domingo ' + pad(u.numero)} · ${faixa.nome}: escrevendo a lição`);
+  const bruto = await chamarIA(PERFIL, promptLicao(u, faixa, passagem, tema), 5000);
+  const L = extrairJSON(bruto);
+
+  const registro = {
+    unidade_id: u.id, faixa_id: faixa.id,
+    tema: L.tema || u.titulo,
+    texto_biblico: u.texto_biblico,
+    verdade_central: u.verdade_central,
+    objetivo: L.objetivo, versiculo_ref: L.versiculo_ref, versiculo_texto: L.versiculo_texto,
+    chave_metodologica: L.chave_metodologica, duracao: L.duracao,
+    recursos_didaticos: L.recursos_didaticos || [],
+    preparacao_professor: L.preparacao_professor,
+    acolhimento: L.acolhimento, introducao: L.introducao, ensino_biblico: L.ensino_biblico,
+    atividade_fixacao: L.atividade_fixacao, aplicacao_pratica: L.aplicacao_pratica,
+    oracao: L.oracao, desafio_semana: L.desafio_semana, desafio_familia: L.desafio_familia,
+    orientacoes_professor: L.orientacoes_professor || [],
+    status: 'gerada', modelo_ia: CONFIG.MODELO,
+    gerada_em: new Date().toISOString(), atualizado_em: new Date().toISOString()
+  };
+
+  const { data: salva, error } = await sb.from('licoes')
+    .upsert(registro, { onConflict:'unidade_id,faixa_id' }).select('id').single();
+  if (error) throw new Error('Ao salvar a lição: ' + error.message);
+
+  registrar(`${u.tipo === 'extra' ? 'Extra' : 'Domingo ' + pad(u.numero)} · ${faixa.nome}: desenhando os materiais`);
+  try{
+    const brutoM = await chamarIA(PERFIL, promptMateriais(u, faixa, L), 9000);
+    const M = extrairJSON(brutoM);
+    const lista = (M.materiais || []).slice(0,3).map((m,i) => ({
+      licao_id: salva.id, tipo: m.tipo || 'folha', titulo: m.titulo || 'Material',
+      instrucoes: m.instrucoes, svg: limparSVG(m.svg), prompt_imagem: m.prompt_imagem,
+      imagem_status: 'provisorio', ordem: i+1
+    }));
+    if (lista.length){
+      await sb.from('materiais').delete().eq('licao_id', salva.id);
+      await sb.from('materiais').insert(lista);
+    }
+  }catch(e){
+    registrar(`   ⚠ materiais falharam (${e.message}) — a lição foi salva mesmo assim`);
+  }
+  return salva.id;
+}
+
+/* Remove qualquer coisa executável do SVG antes de guardar. */
+function limparSVG(svg){
+  if (!svg || typeof svg !== 'string') return null;
+  const i = svg.indexOf('<svg');
+  if (i === -1) return null;
+  return svg.slice(i)
+    .replace(/<script[\s\S]*?<\/script>/gi,'')
+    .replace(/<image[^>]*>/gi,'')
+    .replace(/\son\w+="[^"]*"/gi,'')
+    .replace(/href\s*=\s*"(?!#)[^"]*"/gi,'');
+}
+
+/* --- tela de geração --- */
+async function renderGerar(){
+  const us = await carregarUnidades();
+  if (!us.length) return ir('grade');
+
+  const alvo = estado.trimestre;
+  const t = TRIMESTRES.find(x => x.id === alvo);
+  const doTri = us.filter(u => u.tipo === 'ciclo'
+    && u.numero >= t.faixa[0] && u.numero <= t.faixa[1]).sort((a,b) => a.numero - b.numero);
+
+  const tarefas = [];
+  doTri.forEach(u => faixasDaUnidade(u).forEach(fid => {
+    const j = (u.licoes || []).find(l => l.faixa_id === fid);
+    if (!j || j.status === 'pendente') tarefas.push({ u, fid });
+  }));
+  const total = doTri.reduce((n,u) => n + faixasDaUnidade(u).length, 0);
+
+  moldura(`
+    <p class="eyebrow">Etapa 3 · geração por trimestre</p>
+    <h1>Gerar material</h1>
+    <p class="lede">Cada lição é escrita e salva individualmente. Se a fila for
+      interrompida, nada se perde: ao voltar, ela recomeça de onde parou.</p>
+
+    <div class="tabs" role="tablist">${
+      TRIMESTRES.map(x => `<button class="tab" role="tab"
+        aria-selected="${x.id === alvo}" data-tri="${x.id}">
+        <span class="n">${pad(x.faixa[0])}–${pad(x.faixa[1])}</span>${esc(x.tema)}</button>`).join('')}
+    </div>
+
+    <div class="bloco">
+      <h3 data-n="${pad(alvo)}">${esc(t.tema)}</h3>
+      <dl class="meta">
+        <dt>Lições do trimestre</dt><dd>${total}</dd>
+        <dt>Já geradas</dt><dd>${total - tarefas.length}</dd>
+        <dt>Pendentes</dt><dd>${tarefas.length}</dd>
+      </dl>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin:12px 0 0">
+        O Berçário recebe uma lição por bloco de quatro domingos, repetida nas quatro
+        semanas — por isso o total não é 13 × 5.</p>
+    </div>
+
+    <div class="linha">
+      <button class="btn gold" id="iniciar" ${tarefas.length ? '' : 'disabled'}>
+        ${tarefas.length ? `Gerar ${tarefas.length} lições` : 'Trimestre completo'}</button>
+      <button class="btn ghost" id="parar" style="display:none">Parar</button>
+      <button class="btn ghost" data-ir="inicio">Voltar</button>
+    </div>
+
+    <div id="painel" class="oculto">
+      <div class="barra"><div id="preenche"></div></div>
+      <pre id="registro" class="registro"></pre>
+    </div>`, [ {t:'Início', ir:'inicio'}, {t:'Gerar'} ]);
+
+  app.querySelectorAll('[data-tri]').forEach(b => {
+    b.onclick = () => { estado.trimestre = +b.dataset.tri; renderGerar(); };
+  });
+
+  const btn = $('#iniciar'), btnParar = $('#parar');
+  if (!btn) return;
+  btn.onclick = async () => {
+    let parar = false;
+    btn.disabled = true; btn.textContent = 'Gerando…';
+    btnParar.style.display = ''; btnParar.onclick = () => { parar = true; btnParar.textContent = 'Parando…'; };
+    $('#painel').classList.remove('oculto');
+    const reg = $('#registro'), pre = $('#preenche');
+    const anotar = m => { reg.textContent += m + '\n'; reg.scrollTop = reg.scrollHeight; };
+
+    let feitas = 0, erros = 0;
+    for (const tarefa of tarefas){
+      if (parar){ anotar('— interrompido por você —'); break; }
+      const faixa = FAIXAS.find(f => f.id === tarefa.fid);
+      try{
+        await gerarLicao(tarefa.u, faixa, anotar);
+        feitas++;
+      }catch(e){
+        erros++; anotar(`✗ ${faixa.nome} · ${tarefa.u.titulo}: ${e.message}`);
+      }
+      pre.style.width = Math.round(((feitas+erros)/tarefas.length)*100) + '%';
+    }
+    anotar(`\nConcluído: ${feitas} lições geradas${erros ? `, ${erros} com erro` : ''}.`);
+    estado.cache.unidades = null;
+    btnParar.style.display = 'none';
+    btn.disabled = false; btn.textContent = 'Atualizar';
+    btn.onclick = () => renderGerar();
+  };
+}
+
+/* --- ações sobre uma lição já gerada --- */
+async function mudarStatus(licaoId, status){
+  const campo = status === 'aprovada' ? 'aprovada_em'
+              : status === 'publicada' ? 'publicada_em' : null;
+  const patch = { status, atualizado_em: new Date().toISOString() };
+  if (campo) patch[campo] = new Date().toISOString();
+  const { error } = await sb.from('licoes').update(patch).eq('id', licaoId);
+  if (error) return alert('Não foi possível atualizar: ' + error.message);
+  estado.cache.unidades = null;
+  renderLicao();
+}
+
+async function regerarLicao(licaoId, unidadeId, faixaId){
+  if (!confirm('Regerar esta lição? A versão atual fica guardada no histórico.')) return;
+  const { data: atual } = await sb.from('licoes').select('*').eq('id', licaoId).single();
+  if (atual){
+    await sb.from('licoes_versoes').insert({
+      licao_id: licaoId, versao: atual.versao || 1, conteudo: atual });
+    await sb.from('licoes').update({ versao: (atual.versao || 1) + 1 }).eq('id', licaoId);
+  }
+  const us = await carregarUnidades();
+  const u = us.find(x => x.id === unidadeId);
+  const faixa = FAIXAS.find(f => f.id === faixaId);
+  moldura('<div class="carregando">Regerando a lição…</div>');
+  try{
+    await gerarLicao(u, faixa, () => {});
+    estado.cache.unidades = null;
+    renderLicao();
+  }catch(e){
+    alert('Falhou: ' + e.message); renderLicao();
+  }
+}
+
 /* ---------- roteador ---------- */
 function ir(tela, arg){
   estado.tela = tela;
@@ -833,7 +1328,8 @@ async function render(){
     if (estado.tela === 'inicio')  return await renderInicio();
     if (estado.tela === 'faixa')   return await renderFaixa();
     if (estado.tela === 'licao')   return await renderLicao();
-    if (estado.tela === 'grade')   return renderGrade();
+    if (estado.tela === 'grade')   return await renderGrade();
+    if (estado.tela === 'gerar')   return await renderGerar();
     if (estado.tela === 'moldes')  return renderMoldes();
     return await renderInicio();
   }catch(e){
