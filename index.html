@@ -252,13 +252,13 @@ const CONFIG = {
   SUPABASE_URL: 'https://qldioxaanyxfogffhouu.supabase.co',
   SUPABASE_KEY: 'sb_publishable_n6c8glnXYeRQU8Ue9nVKuQ_twv-UnwZ',
 
-  // Fonte do texto bíblico NAA — o projeto do InterTextus.
-  // Ainda falta acertar o nome da tabela e das colunas.
+  // Fonte do texto bíblico NAA — projeto do app "Leitura da Bíblia".
+  // Atenção: as tabelas ficam no schema 'biblia', não no 'public'.
   BIBLIA: {
-    URL: '',
-    KEY: '',
-    TABELA: '',
-    COLUNAS: { livro:'', capitulo:'', versiculo:'', texto:'', versao:'' }
+    URL: 'https://gehoznuzimebjdqxhtia.supabase.co',
+    KEY: 'sb_publishable_20sQUl-09hCzCcfUtbBYmw_hqEmZBaJ',
+    SCHEMA: 'biblia',
+    VERSAO_ID: null   // ← o id da NAA em biblia.versoes
   },
 
   // Portaria por PIN. Não é segurança criptográfica: é para o material
