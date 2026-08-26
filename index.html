@@ -270,6 +270,34 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
   box-shadow:0 10px 34px -10px rgba(0,0,0,.6);
 }
 
+/* ---------- banco de imagens ---------- */
+.busca{
+  flex:1;min-width:180px;font:inherit;font-size:15px;padding:9px 14px;
+  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);
+}
+.busca:focus{outline:2px solid var(--gold);outline-offset:1px}
+.img-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
+.img-card{
+  margin:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  overflow:hidden;display:flex;flex-direction:column;
+}
+.img-thumb{
+  height:158px;display:flex;align-items:center;justify-content:center;
+  background:#fff;border-bottom:1px solid var(--line);padding:8px;
+}
+.img-thumb img{max-width:100%;max-height:100%;object-fit:contain}
+.pdf-marca{
+  font-family:var(--mono);font-size:13px;letter-spacing:.18em;color:var(--f4);
+  border:2px solid var(--f4);border-radius:6px;padding:10px 14px;
+}
+.img-card figcaption{
+  padding:10px 12px 6px;font-size:13.5px;font-weight:600;line-height:1.3;flex:1;
+  overflow-wrap:anywhere;
+}
+.img-acoes{display:flex;flex-wrap:wrap;gap:5px;padding:0 10px 10px}
+.img-acoes .btn{padding:5px 9px;font-size:11.5px}
+.img-acoes a.btn{text-decoration:none;display:inline-block}
+
 /* ---------- fila de geração ---------- */
 .barra{height:6px;background:var(--line);border-radius:999px;overflow:hidden;margin:18px 0 12px}
 .barra > div{height:100%;width:0;background:var(--gold);transition:width .3s ease}
@@ -671,7 +699,7 @@ async function renderInicio(){
       <div class="linha" style="margin-top:26px">
         <button class="btn" data-ir="grade">Grade dos 52 domingos</button>
         <button class="btn gold" data-ir="gerar">Gerar material</button>
-        <button class="btn ghost" data-ir="moldes">Banco de moldes</button>
+        <button class="btn ghost" data-ir="imagens">Banco de imagens</button>
       </div>` : ''}
   `);
 }
@@ -729,6 +757,7 @@ async function renderFaixa(){
     ${grade}
     <div class="linha" style="margin:18px 0 0">
       <button class="btn ghost" id="imp-tri">Imprimir o trimestre inteiro</button>
+      <button class="btn ghost" data-ir="imagens">Banco de imagens</button>
     </div>
     ${extras.length ? `
       <p class="eyebrow" style="margin-top:34px">Datas especiais · substituem qualquer domingo</p>
@@ -1154,17 +1183,133 @@ function abrirEdicao(id, us){
   ed.querySelector('#e-tit').focus();
 }
 
-function renderMoldes(){
+async function renderImagens(){
+  moldura('<div class="carregando">Abrindo a biblioteca…</div>');
+  const { data, error } = await sb.from('imagens').select('*');
+  if (error) throw new Error(error.message);
+  const todas = (data || []).sort((a,b) =>
+    a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity:'base' }));
+  const filtro = (estado.filtroImg || '').trim().toLowerCase();
+  const lista = filtro
+    ? todas.filter(i => i.nome.toLowerCase().includes(filtro))
+    : todas;
+
+  const admin = estado.papel === 'admin';
+  const cartao = i => `<figure class="img-card">
+    <div class="img-thumb">${i.formato === 'pdf'
+      ? '<span class="pdf-marca">PDF</span>'
+      : `<img src="${esc(i.url)}" alt="${esc(i.nome)}" loading="lazy">`}</div>
+    <figcaption>${esc(i.nome)}</figcaption>
+    <div class="img-acoes">
+      ${i.formato === 'pdf'
+        ? `<a class="btn ghost sm" href="${esc(i.url)}" target="_blank" rel="noopener">Abrir</a>`
+        : `<button class="btn ghost sm" data-impimg="${i.id}">Imprimir A4</button>`}
+      ${admin ? `<button class="btn ghost sm" data-renomear="${i.id}">Renomear</button>
+                 <button class="btn ghost sm" data-excluir="${i.id}">Excluir</button>` : ''}
+    </div>
+  </figure>`;
+
   moldura(`
-    <p class="eyebrow">Banco institucional de recursos</p>
-    <h1>Moldes</h1>
-    <p class="lede">Peças de desenho reutilizáveis que o gerador combina para montar
-      atividades: figuras, molduras, tabuleiros, cartões.</p>
-    <div class="vazio">
-      <p class="t">Banco vazio</p>
-      <p class="d">Os moldes entram junto com o motor de geração, na etapa 3.</p>
-      <button class="btn ghost" data-ir="inicio">Voltar ao início</button>
-    </div>`, [ {t:'Início', ir:'inicio'}, {t:'Moldes'} ]);
+    <p class="eyebrow">Biblioteca do departamento</p>
+    <h1>Banco de imagens</h1>
+    <p class="lede">Figuras prontas para imprimir em A4, para quando a lição pedir
+      algo além do material daquele domingo.</p>
+
+    <div class="linha">
+      <input id="busca-img" class="busca" placeholder="Buscar pelo nome…"
+             value="${esc(estado.filtroImg || '')}" autocomplete="off">
+      ${admin ? `<label class="btn gold" style="cursor:pointer">Enviar imagens
+        <input type="file" class="oculto" id="subir-img" multiple
+               accept="image/png,image/jpeg,image/webp,application/pdf"></label>` : ''}
+      <button class="btn ghost" data-ir="inicio">Voltar</button>
+    </div>
+    <pre id="reg-img" class="registro oculto" style="margin-bottom:16px"></pre>
+
+    ${lista.length
+      ? `<p class="eyebrow">${lista.length} ${lista.length === 1 ? 'imagem' : 'imagens'}${
+           filtro ? ` · filtrando por “${esc(filtro)}”` : ''}</p>
+         <div class="img-grade">${lista.map(cartao).join('')}</div>`
+      : `<div class="vazio">
+           <p class="t">${filtro ? 'Nada com esse nome' : 'Biblioteca vazia'}</p>
+           <p class="d">${filtro
+              ? 'Tente outra palavra.'
+              : (admin ? 'Envie PNG, JPG ou PDF. Você pode selecionar vários de uma vez.'
+                       : 'A liderança do departamento ainda não enviou imagens.')}</p>
+         </div>`}
+  `, [ {t:'Início', ir:'inicio'}, {t:'Banco de imagens'} ]);
+
+  const busca = $('#busca-img');
+  if (busca){
+    let t;
+    busca.oninput = () => {
+      clearTimeout(t);
+      t = setTimeout(() => { estado.filtroImg = busca.value; renderImagens(); }, 260);
+    };
+  }
+
+  app.querySelectorAll('[data-impimg]').forEach(b => {
+    b.onclick = () => {
+      const i = todas.find(x => x.id === b.dataset.impimg);
+      imprimir(`<article class="pagina">
+        <div class="arte-p" style="height:100%;display:flex;align-items:center;justify-content:center">
+          <img src="${esc(i.url)}" alt="${esc(i.nome)}">
+        </div>
+        <div class="rod-p">${esc(i.nome)} · ${esc(RODAPE)}</div></article>`);
+    };
+  });
+
+  app.querySelectorAll('[data-renomear]').forEach(b => {
+    b.onclick = async () => {
+      const i = todas.find(x => x.id === b.dataset.renomear);
+      const novo = prompt('Novo nome da imagem:', i.nome);
+      if (!novo || novo.trim() === i.nome) return;
+      const { error } = await sb.from('imagens').update({ nome: novo.trim() }).eq('id', i.id);
+      if (error) return alert('Não foi possível renomear: ' + error.message);
+      renderImagens();
+    };
+  });
+
+  app.querySelectorAll('[data-excluir]').forEach(b => {
+    b.onclick = async () => {
+      const i = todas.find(x => x.id === b.dataset.excluir);
+      if (!confirm(`Excluir “${i.nome}”? Isso não pode ser desfeito.`)) return;
+      await sb.storage.from('rede-criancas').remove([i.arquivo]);
+      const { error } = await sb.from('imagens').delete().eq('id', i.id);
+      if (error) return alert('Não foi possível excluir: ' + error.message);
+      renderImagens();
+    };
+  });
+
+  const envio = $('#subir-img');
+  if (envio) envio.onchange = e => subirImagens([...e.target.files]);
+}
+
+async function subirImagens(arquivos){
+  if (!arquivos.length) return;
+  const reg = $('#reg-img');
+  reg.classList.remove('oculto'); reg.textContent = '';
+  const anotar = m => { reg.textContent += m + '\n'; reg.scrollTop = reg.scrollHeight; };
+
+  let ok = 0;
+  for (const f of arquivos){
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    const formato = ext === 'pdf' ? 'pdf' : (ext === 'png' ? 'png' : 'jpg');
+    const nome = f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+    const caminho = `imagens/${crypto.randomUUID()}.${ext}`;
+    anotar(`${nome}…`);
+    const { error: e1 } = await sb.storage.from('rede-criancas')
+      .upload(caminho, f, { upsert:false, contentType:f.type });
+    if (e1){ anotar(`   ✗ ${e1.message}`); continue; }
+    const { data:{ publicUrl } } = sb.storage.from('rede-criancas').getPublicUrl(caminho);
+    const { error: e2 } = await sb.from('imagens').insert({
+      nome, arquivo: caminho, url: publicUrl, formato,
+      tamanho_kb: Math.round(f.size / 1024)
+    });
+    if (e2){ anotar(`   ✗ ${e2.message}`); continue; }
+    ok++;
+  }
+  anotar(`\n${ok} de ${arquivos.length} enviadas.`);
+  setTimeout(renderImagens, 900);
 }
 
 /* ---------- dados ---------- */
@@ -1841,7 +1986,7 @@ async function render(){
 
   if (estado.papel === 'professor'){
     estado.faixa = estado.faixaPin;
-    if (!['faixa','licao'].includes(estado.tela)) estado.tela = 'faixa';
+    if (!['faixa','licao','imagens'].includes(estado.tela)) estado.tela = 'faixa';
   }
 
   try{
@@ -1851,7 +1996,7 @@ async function render(){
     if (estado.tela === 'grade')   return await renderGrade();
     if (estado.tela === 'gerar')
       return estado.papel === 'admin' ? await renderGerar() : await renderInicio();
-    if (estado.tela === 'moldes')  return renderMoldes();
+    if (estado.tela === 'imagens') return await renderImagens();
     return await renderInicio();
   }catch(e){
     console.error(e);
