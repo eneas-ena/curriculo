@@ -374,6 +374,8 @@ const CONFIG = {
   // certo chegar à turma certa e ninguém disparar geração por engano.
   PIN_ADMIN: '1988',
   PIN_FAIXA: { bercario:'1111', maternal:'2222', jardim:'3333', primarios:'4444', juniores:'5555' },
+  // Vê todas as faixas e imprime; não gera, não aprova, não edita.
+  PIN_SUPERVISAO: '7777',
 
   // Motor de geração (Cloudflare Worker — veja worker.js)
   WORKER_URL: 'https://curriculo-criancas.eneaspr.workers.dev',
@@ -566,6 +568,11 @@ function renderPorta(){
       localStorage.setItem('rc_papel','admin'); localStorage.removeItem('rc_faixa');
       return ir('inicio');
     }
+    if (v === CONFIG.PIN_SUPERVISAO){
+      estado.papel = 'supervisao'; estado.faixaPin = null;
+      localStorage.setItem('rc_papel','supervisao'); localStorage.removeItem('rc_faixa');
+      return ir('inicio');
+    }
     const achou = Object.entries(CONFIG.PIN_FAIXA).find(([,p]) => p === v);
     if (achou){
       estado.papel = 'professor'; estado.faixaPin = achou[0];
@@ -585,6 +592,8 @@ function renderPorta(){
 function moldura(conteudo, migalhas = []){
   const papel = estado.papel === 'admin'
     ? '<span class="chip gold">Administração</span>'
+    : estado.papel === 'supervisao'
+    ? '<span class="chip">Supervisão</span>'
     : `<span class="chip">Professor · ${esc(faixaPor(estado.faixaPin)?.nome || '')}</span>`;
   const crumb = migalhas.length ? `<nav class="crumb">${
       migalhas.map((m,i) => i === migalhas.length-1
@@ -796,10 +805,36 @@ async function renderLicao(){
           <h3 data-n="05">Objetivo e versículo</h3>
           <dl class="meta">
             <dt>Objetivo</dt><dd>${esc(l.objetivo || '')}</dd>
-            <dt>Versículo</dt><dd>${esc(l.versiculo_texto || '')}
-              ${l.versiculo_ref ? `<em style="color:var(--ink-soft)"> — ${esc(l.versiculo_ref)} (NAA)</em>` : ''}</dd>
+            <dt>Versículo</dt><dd id="vers-mostra">${esc(l.versiculo_texto || '')}
+              ${l.versiculo_ref ? `<em style="color:var(--ink-soft)"> — ${esc(l.versiculo_ref)}</em>` : ''}
+              ${estado.papel === 'admin'
+                ? ' <button class="btn ghost sm" id="edt-vers" style="margin-left:4px">Trocar pela NAA</button>' : ''}</dd>
             <dt>Duração</dt><dd>${esc(l.duracao || f.duracao)}</dd>
           </dl>
+          <div id="vers-form" class="oculto" style="margin-top:12px">
+            <label style="display:block;font-family:var(--mono);font-size:10px;
+                   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)">
+              Texto do versículo
+              <textarea id="vers-txt" rows="3" style="display:block;width:100%;margin-top:4px;
+                font:inherit;font-size:14.5px;padding:8px 10px;border:1px solid var(--line);
+                border-radius:6px;text-transform:none;letter-spacing:normal">${esc(l.versiculo_texto || '')}</textarea>
+            </label>
+            <label style="display:block;margin-top:8px;font-family:var(--mono);font-size:10px;
+                   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)">
+              Referência
+              <input id="vers-ref" value="${esc(l.versiculo_ref || '')}"
+                style="display:block;width:100%;margin-top:4px;font:inherit;font-size:14.5px;
+                padding:8px 10px;border:1px solid var(--line);border-radius:6px;
+                text-transform:none;letter-spacing:normal">
+            </label>
+            <div class="linha" style="margin:10px 0 0">
+              <button class="btn sm" id="vers-salvar">Salvar</button>
+              <button class="btn ghost sm" id="vers-cancelar">Cancelar</button>
+            </div>
+            <p style="font-size:12.5px;color:var(--ink-soft);margin:10px 0 0">
+              Cole aqui o versículo na NAA. Ele passa a valer na tela e na impressão,
+              no lugar do texto da Bíblia Livre.</p>
+          </div>
         </div>
         ${l.chave_metodologica ? `<div class="destaque">
           <div class="rot">Chave metodológica</div>
@@ -862,6 +897,28 @@ async function renderLicao(){
           </div>` : ''}
       </aside>
     </div>`, migalhas);
+
+  const btnVers = $('#edt-vers');
+  if (btnVers) btnVers.onclick = () => {
+    $('#vers-form').classList.remove('oculto');
+    btnVers.classList.add('oculto');
+    $('#vers-txt').focus();
+  };
+  const btnVersCancel = $('#vers-cancelar');
+  if (btnVersCancel) btnVersCancel.onclick = () => renderLicao();
+  const btnVersSalvar = $('#vers-salvar');
+  if (btnVersSalvar) btnVersSalvar.onclick = async () => {
+    btnVersSalvar.disabled = true; btnVersSalvar.textContent = 'Salvando…';
+    const { error } = await sb.from('licoes').update({
+      versiculo_texto: $('#vers-txt').value.trim(),
+      versiculo_ref: $('#vers-ref').value.trim(),
+      atualizado_em: new Date().toISOString()
+    }).eq('id', l.id);
+    if (error){ alert('Não foi possível salvar: ' + error.message);
+                btnVersSalvar.disabled = false; btnVersSalvar.textContent = 'Salvar'; return; }
+    estado.cache.unidades = null;
+    renderLicao();
+  };
 
   const tudo = { ficha:true, aluno:true, mats:true, familia:true };
   const btnTudo = $('#imp-tudo');
@@ -979,7 +1036,7 @@ async function renderGrade(){
       <td class="rr">${esc(u.texto_biblico)}</td>
       <td class="aa">
         ${u.status === 'aprovada' ? '<span class="selo def">Aprovada</span>' : ''}
-        <button class="btn ghost sm" data-editar="${u.id}">Editar</button>
+        ${estado.papel === 'admin' ? `<button class="btn ghost sm" data-editar="${u.id}">Editar</button>` : ''}
       </td></tr>`;
   };
 
@@ -1012,8 +1069,8 @@ async function renderGrade(){
     <p class="lede">Cada trimestre tem três blocos de quatro domingos e um domingo de
       revisão. O Berçário usa o texto do primeiro domingo do bloco nas quatro semanas.</p>
     <div class="linha">
-      <button class="btn gold" id="aprovar" ${pendentes ? '' : 'disabled'}>
-        ${pendentes ? `Aprovar a grade (${pendentes} pendentes)` : 'Grade aprovada'}</button>
+      ${estado.papel !== 'admin' ? '' : `<button class="btn gold" id="aprovar" ${pendentes ? '' : 'disabled'}>
+        ${pendentes ? `Aprovar a grade (${pendentes} pendentes)` : 'Grade aprovada'}</button>`}
       <button class="btn ghost" data-ir="inicio">Voltar ao início</button>
     </div>
     ${corpo}`, [ {t:'Início', ir:'inicio'}, {t:'Grade'} ]);
@@ -1094,7 +1151,7 @@ async function carregarProgresso(){
   const { data } = await sb.from('v_progresso_faixa').select('*');
   (data || []).forEach(r => {
     mapa[r.faixa_id] = {
-      geradas: estado.papel === 'admin' ? r.geradas : r.publicadas,
+      geradas: estado.papel === 'professor' ? r.publicadas : r.geradas,
       total: r.total_ciclo || 52
     };
   });
@@ -1430,9 +1487,13 @@ async function renderGerar(){
   if (!us.length) return ir('grade');
 
   const alvo = estado.trimestre;
-  const t = TRIMESTRES.find(x => x.id === alvo);
-  const doTri = us.filter(u => u.tipo === 'ciclo'
-    && u.numero >= t.faixa[0] && u.numero <= t.faixa[1]).sort((a,b) => a.numero - b.numero);
+  const extrasAgora = alvo === 0;
+  const t = extrasAgora ? { id:0, tema:'Datas especiais', faixa:[0,0] }
+                        : TRIMESTRES.find(x => x.id === alvo);
+  const doTri = extrasAgora
+    ? us.filter(u => u.tipo === 'extra').sort((a,b) => (a.ordem||0) - (b.ordem||0))
+    : us.filter(u => u.tipo === 'ciclo'
+        && u.numero >= t.faixa[0] && u.numero <= t.faixa[1]).sort((a,b) => a.numero - b.numero);
 
   const tarefas = [];
   doTri.forEach(u => faixasDaUnidade(u).forEach(fid => {
@@ -1442,8 +1503,8 @@ async function renderGerar(){
   const total = doTri.reduce((n,u) => n + faixasDaUnidade(u).length, 0);
 
   moldura(`
-    <p class="eyebrow">Geração por trimestre</p>
-    <h1>Gerar material</h1>
+    <p class="eyebrow">Lições e materiais das cinco faixas</p>
+    <h1>Gerar o trimestre</h1>
     ${motorPronto() ? `<div class="aviso"><strong>O motor ainda não está ligado</strong>
        ${esc(motorPronto())}</div>` : ''}
     <p class="lede">Cada lição é escrita e salva individualmente. Se a fila for
@@ -1453,18 +1514,21 @@ async function renderGerar(){
       TRIMESTRES.map(x => `<button class="tab" role="tab"
         aria-selected="${x.id === alvo}" data-tri="${x.id}">
         <span class="n">${pad(x.faixa[0])}–${pad(x.faixa[1])}</span>${esc(x.tema)}</button>`).join('')}
+      <button class="tab" role="tab" aria-selected="${extrasAgora}" data-tri="0">
+        <span class="n">+5</span>Datas especiais</button>
     </div>
 
     <div class="bloco">
-      <h3 data-n="${pad(alvo)}">${esc(t.tema)}</h3>
+      <h3 data-n="${extrasAgora ? '★' : pad(alvo)}">${esc(t.tema)}</h3>
       <dl class="meta">
         <dt>Lições do trimestre</dt><dd>${total}</dd>
         <dt>Já geradas</dt><dd>${total - tarefas.length}</dd>
         <dt>Pendentes</dt><dd>${tarefas.length}</dd>
       </dl>
       <p style="color:var(--ink-soft);font-size:13.5px;margin:12px 0 0">
-        O Berçário recebe uma lição por bloco de quatro domingos, repetida nas quatro
-        semanas — por isso o total não é 13 × 5.</p>
+        ${extrasAgora
+          ? 'As cinco datas especiais recebem lição em todas as faixas, inclusive no Berçário.'
+          : 'O Berçário recebe uma lição por bloco de quatro domingos, repetida nas quatro semanas — por isso o total não é 13 × 5.'}</p>
     </div>
 
     <div class="linha">
@@ -1472,6 +1536,17 @@ async function renderGerar(){
         ${tarefas.length ? `Gerar ${tarefas.length} lições` : 'Trimestre completo'}</button>
       <button class="btn ghost" id="parar" style="display:none">Parar</button>
       <button class="btn ghost" data-ir="inicio">Voltar</button>
+    </div>
+
+    <div class="bloco">
+      <h3 data-n="✓">Aprovar e publicar em lote</h3>
+      <p style="color:var(--ink-soft);font-size:13.5px;margin:0 0 12px">
+        Aprovar não libera nada para os professores — só publicar libera. Revise
+        antes: uma vez publicada, a lição aparece na tela da faixa.</p>
+      <div class="linha" style="margin:0">
+        <button class="btn ghost sm" id="aprovar-lote">Aprovar todas as geradas</button>
+        <button class="btn gold sm" id="publicar-lote">Publicar todas as aprovadas</button>
+      </div>
     </div>
 
     <div id="painel" class="oculto">
@@ -1482,6 +1557,24 @@ async function renderGerar(){
   app.querySelectorAll('[data-tri]').forEach(b => {
     b.onclick = () => { estado.trimestre = +b.dataset.tri; renderGerar(); };
   });
+
+  const emLote = async (de, para, rotulo, botao) => {
+    const ids = doTri.map(u => u.id);
+    botao.disabled = true; botao.textContent = 'Aplicando…';
+    const campo = para === 'aprovada' ? 'aprovada_em' : 'publicada_em';
+    const { data, error } = await sb.from('licoes')
+      .update({ status: para, [campo]: new Date().toISOString(),
+                atualizado_em: new Date().toISOString() })
+      .in('unidade_id', ids).eq('status', de).select('id');
+    if (error) alert('Não foi possível: ' + error.message);
+    else alert(`${data?.length || 0} lições passaram para ${rotulo}.`);
+    estado.cache.unidades = null;
+    renderGerar();
+  };
+  const btnAp = $('#aprovar-lote');
+  if (btnAp) btnAp.onclick = () => emLote('gerada','aprovada','aprovadas', btnAp);
+  const btnPub = $('#publicar-lote');
+  if (btnPub) btnPub.onclick = () => emLote('aprovada','publicada','publicadas', btnPub);
 
   const btn = $('#iniciar'), btnParar = $('#parar');
   if (!btn) return;
@@ -1552,7 +1645,7 @@ async function regerarLicao(licaoId, unidadeId, faixaId){
    MONTAGEM DAS PEÇAS IMPRESSAS
    =================================================================== */
 const RODAPE = 'Igreja Vidas — Departamento Infantil · Rede de Crianças';
-const CREDITO = 'Texto bíblico: Bíblia Livre (domínio público).';
+const CREDITO = 'Texto bíblico: Bíblia Livre (domínio público), salvo indicação em contrário.';
 
 function cabecalho(u, faixa, peca){
   const dom = u.tipo === 'extra'
@@ -1675,7 +1768,7 @@ async function imprimirTrimestre(faixa, trimestre){
   const { data: licoes } = await sb.from('licoes').select('*')
     .in('unidade_id', ids).eq('faixa_id', faixa.id);
   const visiveis = (licoes || []).filter(l =>
-    estado.papel === 'admin' ? l.status !== 'pendente' : l.status === 'publicada');
+    estado.papel === 'professor' ? l.status === 'publicada' : l.status !== 'pendente');
   if (!visiveis.length) return alert('Nenhuma lição disponível neste trimestre ainda.');
 
   const { data: mats } = await sb.from('materiais').select('*')
@@ -1721,7 +1814,8 @@ async function render(){
     if (estado.tela === 'faixa')   return await renderFaixa();
     if (estado.tela === 'licao')   return await renderLicao();
     if (estado.tela === 'grade')   return await renderGrade();
-    if (estado.tela === 'gerar')   return await renderGerar();
+    if (estado.tela === 'gerar')
+      return estado.papel === 'admin' ? await renderGerar() : await renderInicio();
     if (estado.tela === 'moldes')  return renderMoldes();
     return await renderInicio();
   }catch(e){
