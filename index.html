@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Rede de Crianças — Igreja Vidas</title>
 <meta name="theme-color" content="#0F1B33">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rede de Crianças">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -254,6 +259,13 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
   .tab-grade td,.tab-grade tr.sub td{padding-left:10px;padding-right:10px}
 }
 
+/* ---------- marca ---------- */
+.brasao{width:34px;height:34px;border-radius:8px;flex:none;display:block}
+.brasao-grande{
+  width:104px;height:104px;border-radius:22px;display:block;margin:0 auto 20px;
+  box-shadow:0 10px 34px -10px rgba(0,0,0,.6);
+}
+
 /* ---------- fila de geração ---------- */
 .barra{height:6px;background:var(--line);border-radius:999px;overflow:hidden;margin:18px 0 12px}
 .barra > div{height:100%;width:0;background:var(--gold);transition:width .3s ease}
@@ -477,6 +489,7 @@ const faixaPor = slug => FAIXAS.find(f => f.slug === slug);
 function renderPorta(){
   app.innerHTML = `
   <div class="porta"><div class="caixa">
+    <img class="brasao-grande" src="icone-512.png" alt="">
     <div class="selo-abre">Igreja Vidas · Departamento Infantil</div>
     <h1>Rede de Crianças</h1>
     <p class="sub">Informe seu PIN para entrar.</p>
@@ -520,6 +533,7 @@ function moldura(conteudo, migalhas = []){
       ).join('')}</nav>` : '';
   app.innerHTML = `
     <header class="topbar">
+      <img class="brasao" src="icone-192.png" alt="">
       <div class="mark">Rede de Crianças<small>Igreja Vidas</small></div>
       <div class="spacer"></div>${papel}
       <button class="chip" id="sair">Sair</button>
@@ -661,8 +675,31 @@ async function renderLicao(){
         <p class="d">Esta unidade já está na grade, mas o material desta faixa
            ainda não foi produzido.</p>
         ${estado.papel === 'admin'
-          ? '<button class="btn gold" disabled>Gerar lição — etapa 3</button>' : ''}
+          ? `<button class="btn gold" id="gerar-uma">Gerar esta lição</button>` : ''}
+      </div>
+      <div id="painel-uma" class="oculto" style="margin-top:18px">
+        <div class="barra"><div id="preenche" style="width:40%"></div></div>
+        <pre id="registro" class="registro"></pre>
       </div>`, migalhas);
+
+    const btnUma = $('#gerar-uma');
+    if (btnUma) btnUma.onclick = async () => {
+      const falta = motorPronto();
+      if (falta) return alert(falta);
+      btnUma.disabled = true; btnUma.textContent = 'Gerando…';
+      $('#painel-uma').classList.remove('oculto');
+      const reg = $('#registro');
+      const anotar = m => { reg.textContent += m + '\n'; reg.scrollTop = reg.scrollHeight; };
+      try{
+        await gerarLicao(u, f, anotar);
+        estado.cache.unidades = null;
+        renderLicao();
+      }catch(e){
+        anotar('✗ ' + e.message);
+        btnUma.disabled = false; btnUma.textContent = 'Tentar de novo';
+      }
+    };
+    return;
   }
 
   const mats = await carregarMateriais(l.id);
@@ -1011,6 +1048,16 @@ async function buscarPassagem(ref){
   return blocos.join('\n\n');
 }
 
+/* Diz o que falta para o motor funcionar, ou null se estiver pronto. */
+function motorPronto(){
+  if (!CONFIG.WORKER_URL || CONFIG.WORKER_URL.includes('SEU-WORKER'))
+    return 'O motor de geração ainda não foi ligado.\n\nPublique o worker.js no Cloudflare '
+         + 'e cole o endereço dele em CONFIG.WORKER_URL, dentro do index.html.';
+  if (!CONFIG.BIBLIA.VERSAO_ID)
+    return 'Falta indicar a versão bíblica em CONFIG.BIBLIA.VERSAO_ID.';
+  return null;
+}
+
 /* --- chamada ao motor --- */
 async function chamarIA(system, prompt, maxTokens){
   const r = await fetch(CONFIG.WORKER_URL, {
@@ -1199,8 +1246,10 @@ async function renderGerar(){
   const total = doTri.reduce((n,u) => n + faixasDaUnidade(u).length, 0);
 
   moldura(`
-    <p class="eyebrow">Etapa 3 · geração por trimestre</p>
+    <p class="eyebrow">Geração por trimestre</p>
     <h1>Gerar material</h1>
+    ${motorPronto() ? `<div class="aviso"><strong>O motor ainda não está ligado</strong>
+       ${esc(motorPronto())}</div>` : ''}
     <p class="lede">Cada lição é escrita e salva individualmente. Se a fila for
       interrompida, nada se perde: ao voltar, ela recomeça de onde parou.</p>
 
@@ -1241,6 +1290,8 @@ async function renderGerar(){
   const btn = $('#iniciar'), btnParar = $('#parar');
   if (!btn) return;
   btn.onclick = async () => {
+    const falta = motorPronto();
+    if (falta) return alert(falta);
     let parar = false;
     btn.disabled = true; btn.textContent = 'Gerando…';
     btnParar.style.display = ''; btnParar.onclick = () => { parar = true; btnParar.textContent = 'Parando…'; };
@@ -1343,15 +1394,19 @@ async function render(){
 }
 
 /* ---------- manifesto PWA embutido ---------- */
+/* Os caminhos precisam ser absolutos: o manifesto é servido como Blob,
+   e um caminho relativo seria resolvido contra a URL do Blob, não do site. */
+const abs = arq => new URL(arq, location.href).href;
 const manifesto = {
-  name:'Rede de Crianças', short_name:'Rede', start_url:'.', display:'standalone',
-  background_color:'#0F1B33', theme_color:'#0F1B33',
-  icons:[{ src:'data:image/svg+xml;base64,' + btoa(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-       <rect width="512" height="512" fill="#0F1B33"/>
-       <g fill="none" stroke="#C9A227" stroke-width="26" stroke-linecap="round">
-         <path d="M136 190h240M156 256h200M176 322h160"/></g></svg>`),
-    sizes:'512x512', type:'image/svg+xml', purpose:'any' }]
+  name:'Currículo da Rede de Crianças', short_name:'Rede de Crianças',
+  description:'Material do Departamento Infantil da Igreja Vidas',
+  start_url:'.', scope:'.', display:'standalone', orientation:'portrait',
+  background_color:'#0F1B33', theme_color:'#0F1B33', lang:'pt-BR',
+  icons:[
+    { src:abs('icone-192.png'), sizes:'192x192', type:'image/png', purpose:'any' },
+    { src:abs('icone-512.png'), sizes:'512x512', type:'image/png', purpose:'any' },
+    { src:abs('icone-512.png'), sizes:'512x512', type:'image/png', purpose:'maskable' }
+  ]
 };
 const linkMan = document.createElement('link');
 linkMan.rel = 'manifest';
