@@ -761,8 +761,14 @@ async function renderLicao(){
         <p class="eyebrow">Materiais para imprimir</p>
         ${mats.length ? mats.map(cartaoMaterial).join('')
           : `<div class="vazio" style="padding:24px 16px">
-               <p class="d" style="margin:0">Os materiais são criados junto com a
-                  lição, na etapa de geração.</p></div>`}
+               <p class="d" style="margin:0 0 14px">Esta lição ainda está sem materiais
+                  impressos.</p>
+               ${estado.papel === 'admin'
+                 ? '<button class="btn gold sm" id="refazer-mats">Gerar materiais</button>' : ''}
+             </div>`}
+        ${mats.length && estado.papel === 'admin'
+          ? '<button class="btn ghost sm" id="refazer-mats" style="width:100%;margin-top:4px">Refazer os materiais</button>' : ''}
+        <pre id="registro-mats" class="registro oculto" style="margin-top:10px"></pre>
         <button class="btn ghost" style="width:100%;margin-top:8px" disabled>
           Baixar tudo em PDF — etapa 4</button>
         ${estado.papel === 'admin' ? `
@@ -781,6 +787,23 @@ async function renderLicao(){
           </div>` : ''}
       </aside>
     </div>`, migalhas);
+
+  const btnMats = $('#refazer-mats');
+  if (btnMats) btnMats.onclick = async () => {
+    const falta = motorPronto();
+    if (falta) return alert(falta);
+    btnMats.disabled = true; btnMats.textContent = 'Desenhando…';
+    const reg = $('#registro-mats');
+    reg.classList.remove('oculto'); reg.textContent = '';
+    const anotar = m => { reg.textContent += m.trim() + '\n'; reg.scrollTop = reg.scrollHeight; };
+    try{
+      await gerarMateriais(u, f, l, l.id, anotar);
+      renderLicao();
+    }catch(e){
+      anotar('✗ ' + e.message);
+      btnMats.disabled = false; btnMats.textContent = 'Tentar de novo';
+    }
+  };
 
   app.querySelectorAll('[data-acao]').forEach(b => {
     b.onclick = () => mudarStatus(l.id, b.dataset.acao);
@@ -1151,26 +1174,86 @@ VERDADE CENTRAL: ${u.verdade_central}
 ATIVIDADE DE FIXAÇÃO PREVISTA: ${licao.atividade_fixacao}
 MATERIAIS TÍPICOS DESTA IDADE: ${s.materiais}
 
-Produza de 2 a 3 materiais. Para cada um:
+Produza de 2 a 3 materiais.
 
-- "svg": desenho completo e autossuficiente, começando em <svg e terminando em </svg>,
-  com viewBox="0 0 560 760" (proporção A4 em pé). Traço preto (#111), stroke-width entre
-  3 e 5, fill="none" ou "#fff", formas grandes e bem separadas para caber giz de cera.
-  Sem <image>, sem <script>, sem fontes externas, sem gradiente. Texto só com <text> em
-  família sans-serif. Isto é arte provisória: priorize clareza geométrica sobre beleza.
-- "prompt_imagem": instrução em português para gerar a arte definitiva em uma IA de
-  imagem. Descreva a cena, diga que é desenho de linha preto e branco para colorir,
-  traço grosso e contínuo, sem sombreado, sem hachura, fundo branco, áreas amplas,
-  proporção A4 em pé, adequado a criança de ${s.idade}.
+O SVG deve ser completo e autossuficiente, com viewBox="0 0 560 760" (proporção A4
+em pé), traço preto (#111), stroke-width entre 3 e 5, fill="none" ou "#fff", formas
+grandes e bem separadas para caber giz de cera. Sem <image>, sem <script>, sem fontes
+externas, sem gradiente. Texto apenas com <text> em família sans-serif. Isto é arte
+provisória: priorize clareza geométrica, não beleza. Mantenha cada SVG enxuto — no
+máximo 40 elementos. É melhor um desenho simples e completo que um elaborado e cortado.
 
-Responda APENAS com um objeto JSON, sem comentários e sem cercas de código:
-{ "materiais": [
-  { "tipo": "colorir|dobradura|colagem|jogo|cartao|folha|recortavel|mapa",
-    "titulo": "nome curto",
-    "instrucoes": "o que o professor faz com esta folha",
-    "svg": "<svg ...>...</svg>",
-    "prompt_imagem": "..." }
-]}`;
+O PROMPT é a instrução, em português, para gerar a arte definitiva numa IA de imagem.
+Descreva a cena e diga que é desenho de linha preto e branco para colorir, traço grosso
+e contínuo, sem sombreado, sem hachura, fundo branco, áreas amplas, proporção A4 em pé,
+adequado a criança de ${s.idade}.
+
+Responda EXATAMENTE neste formato de texto puro, repetindo o bloco para cada material.
+Não use JSON, não use cercas de código, não escreva nada antes ou depois.
+
+===MATERIAL===
+TIPO: um entre colorir, dobradura, colagem, jogo, cartao, folha, recortavel, mapa
+TITULO: nome curto
+INSTRUCOES: o que o professor faz com esta folha
+PROMPT: instrução para a IA de imagem
+SVG:
+<svg viewBox="0 0 560 760" xmlns="http://www.w3.org/2000/svg">...</svg>
+===FIM===`;
+}
+
+/* Lê o formato delimitado. Aspas não têm significado aqui, então um SVG
+   malformado não derruba os demais materiais. */
+function lerMateriais(txt){
+  const saida = [];
+  const blocos = String(txt).split('===MATERIAL===').slice(1);
+  for (const bruto of blocos){
+    const corpo = bruto.split('===FIM===')[0];
+    const campo = rot => {
+      const m = corpo.match(new RegExp('^\\s*' + rot + ':\\s*(.+)$', 'mi'));
+      return m ? m[1].trim() : '';
+    };
+    const iSvg = corpo.search(/^\s*SVG:\s*$/mi);
+    let svg = null;
+    if (iSvg !== -1){
+      const cru = corpo.slice(iSvg).replace(/^\s*SVG:\s*/i, '');
+      svg = limparSVG(cru);
+    }
+    const titulo = campo('TITULO');
+    if (!titulo && !svg) continue;
+    saida.push({
+      tipo: (campo('TIPO') || 'folha').toLowerCase().split(/[\s,]/)[0],
+      titulo: titulo || 'Material',
+      instrucoes: campo('INSTRUCOES'),
+      prompt_imagem: campo('PROMPT'),
+      svg
+    });
+  }
+  return saida;
+}
+
+const TIPOS_MATERIAL = ['colorir','dobradura','colagem','jogo','cartao','folha','recortavel','mapa'];
+
+/* Gera (ou regera) apenas os materiais de uma lição já escrita. */
+async function gerarMateriais(u, faixa, licao, licaoId, registrar){
+  const bruto = await chamarIA(PERFIL, promptMateriais(u, faixa, licao), 16000);
+  const lista = lerMateriais(bruto).slice(0,3).map((m,i) => ({
+    licao_id: licaoId,
+    tipo: TIPOS_MATERIAL.includes(m.tipo) ? m.tipo : 'folha',
+    titulo: m.titulo, instrucoes: m.instrucoes,
+    svg: m.svg, prompt_imagem: m.prompt_imagem,
+    imagem_status: 'provisorio', ordem: i+1
+  }));
+  if (!lista.length) throw new Error('O motor não devolveu nenhum material legível.');
+
+  const semDesenho = lista.filter(m => !m.svg).length;
+  if (semDesenho) registrar(`   ${semDesenho} material(is) sem desenho provisório — `
+    + `o prompt para a arte definitiva foi salvo do mesmo jeito`);
+
+  await sb.from('materiais').delete().eq('licao_id', licaoId);
+  const { error } = await sb.from('materiais').insert(lista);
+  if (error) throw new Error('Ao salvar os materiais: ' + error.message);
+  registrar(`   ${lista.length} materiais salvos`);
+  return lista.length;
 }
 
 /* --- geração de uma lição --- */
@@ -1206,19 +1289,10 @@ async function gerarLicao(u, faixa, registrar){
 
   registrar(`${u.tipo === 'extra' ? 'Extra' : 'Domingo ' + pad(u.numero)} · ${faixa.nome}: desenhando os materiais`);
   try{
-    const brutoM = await chamarIA(PERFIL, promptMateriais(u, faixa, L), 9000);
-    const M = extrairJSON(brutoM);
-    const lista = (M.materiais || []).slice(0,3).map((m,i) => ({
-      licao_id: salva.id, tipo: m.tipo || 'folha', titulo: m.titulo || 'Material',
-      instrucoes: m.instrucoes, svg: limparSVG(m.svg), prompt_imagem: m.prompt_imagem,
-      imagem_status: 'provisorio', ordem: i+1
-    }));
-    if (lista.length){
-      await sb.from('materiais').delete().eq('licao_id', salva.id);
-      await sb.from('materiais').insert(lista);
-    }
+    await gerarMateriais(u, faixa, L, salva.id, registrar);
   }catch(e){
-    registrar(`   ⚠ materiais falharam (${e.message}) — a lição foi salva mesmo assim`);
+    registrar(`   ⚠ materiais falharam: ${e.message}`);
+    registrar(`   a lição foi salva — use "Gerar materiais" na tela dela para tentar de novo`);
   }
   return salva.id;
 }
@@ -1227,8 +1301,10 @@ async function gerarLicao(u, faixa, registrar){
 function limparSVG(svg){
   if (!svg || typeof svg !== 'string') return null;
   const i = svg.indexOf('<svg');
-  if (i === -1) return null;
-  return svg.slice(i)
+  const f = svg.lastIndexOf('</svg>');
+  // Resposta cortada no meio: melhor nenhum desenho que um desenho quebrado.
+  if (i === -1 || f === -1 || f < i) return null;
+  return svg.slice(i, f + 6)
     .replace(/<script[\s\S]*?<\/script>/gi,'')
     .replace(/<image[^>]*>/gi,'')
     .replace(/\son\w+="[^"]*"/gi,'')
