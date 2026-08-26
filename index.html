@@ -248,17 +248,18 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
    CONFIGURAÇÃO — preencha aqui e faça o commit.
    =================================================================== */
 const CONFIG = {
-  // Projeto Supabase deste app (rode o schema.sql nele antes)
+  // Projeto Supabase deste app
   SUPABASE_URL: 'https://qldioxaanyxfogffhouu.supabase.co',
   SUPABASE_KEY: 'sb_publishable_n6c8glnXYeRQU8Ue9nVKuQ_twv-UnwZ',
 
-  // Fonte do texto bíblico NAA — projeto do app "Leitura da Bíblia".
-  // Atenção: as tabelas ficam no schema 'biblia', não no 'public'.
+  // Texto bíblico: projeto do app "Leitura da Bíblia".
+  // As tabelas ficam no schema 'biblia', não no 'public'.
+  // versao_id 2 = Bíblia Livre (2018), domínio público.
   BIBLIA: {
     URL: 'https://gehoznuzimebjdqxhtia.supabase.co',
     KEY: 'sb_publishable_20sQUl-09hCzCcfUtbBYmw_hqEmZBaJ',
     SCHEMA: 'biblia',
-    VERSAO_ID: null   // ← o id da NAA em biblia.versoes
+    VERSAO_ID: 2
   },
 
   // Portaria por PIN. Não é segurança criptográfica: é para o material
