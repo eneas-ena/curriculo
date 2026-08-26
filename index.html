@@ -127,6 +127,9 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
 .tab[aria-selected="true"]{background:var(--f5);border-color:var(--f5);color:#fff}
 .tab .n{font-family:var(--mono);font-size:11px;opacity:.7;margin-right:6px}
 
+.tabs.anos{margin-bottom:12px}
+.tabs.anos .tab[aria-selected="true"]{background:var(--gold);border-color:var(--gold);color:#2A2004}
+
 /* ---------- grade de domingos ---------- */
 .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:12px}
 .card{
@@ -403,6 +406,12 @@ const TRIMESTRES = [
   { id:4, tema:'Servindo e anunciando',    faixa:[40,52] }
 ];
 
+const ANOS = [
+  { id:1, nome:'Ano 1', tema:'A grande história' },
+  { id:2, nome:'Ano 2', tema:'Pessoas e encontros' },
+  { id:3, nome:'Ano 3', tema:'Palavras e ensinos' }
+];
+
 const EXTRAS = [
   { slug:'pascoa',   nome:'Páscoa' },
   { slug:'natal',    nome:'Natal' },
@@ -535,6 +544,7 @@ const estado = {
   faixaPin: localStorage.getItem('rc_faixa') || null,  // slug, quando professor
   tela: 'inicio',
   faixa: null,
+  ano: +(localStorage.getItem('rc_ano') || 1),
   trimestre: 1,
   licaoId: null,
   cache: { unidades:null, progresso:null }
@@ -617,6 +627,24 @@ function moldura(conteudo, migalhas = []){
   });
 }
 
+/* Barra de seleção do ano do ciclo. */
+function abasAno(){
+  return `<div class="tabs anos" role="tablist">${
+    ANOS.map(a => `<button class="tab" role="tab" aria-selected="${a.id === estado.ano}"
+      data-ano="${a.id}"><span class="n">${a.nome}</span>${esc(a.tema)}</button>`).join('')}
+  </div>`;
+}
+function ligarAbasAno(redesenhar){
+  app.querySelectorAll('[data-ano]').forEach(b => {
+    b.onclick = () => {
+      estado.ano = +b.dataset.ano;
+      localStorage.setItem('rc_ano', estado.ano);
+      redesenhar();
+    };
+  });
+}
+const doAno = u => u.ano === estado.ano;
+
 /* ---------- tela: início (os cinco estratos) ---------- */
 async function renderInicio(){
   const prog = await carregarProgresso();
@@ -655,11 +683,11 @@ async function renderFaixa(){
   const unidades = await carregarUnidades();
   const t = TRIMESTRES.find(t => t.id === estado.trimestre);
 
-  let doTri = unidades.filter(u =>
+  let doTri = unidades.filter(u => doAno(u) &&
     u.tipo === 'ciclo' && u.numero >= t.faixa[0] && u.numero <= t.faixa[1]);
   // O Berçário tem uma lição por bloco de quatro domingos.
   if (f.id === 1) doTri = doTri.filter(u => faixasDaUnidade(u).includes(1));
-  const extras = unidades.filter(u => u.tipo === 'extra');
+  const extras = unidades.filter(u => doAno(u) && u.tipo === 'extra');
 
   const cartao = u => {
     const l = (u.licoes || []).find(x => x.faixa_id === f.id);
@@ -692,6 +720,7 @@ async function renderFaixa(){
       <h1 style="margin:0">${esc(f.nome)}</h1>
       <p style="margin:4px 0 0;opacity:.82">${esc(f.idade)} — “${esc(f.pergunta)}”</p>
     </div>
+    ${abasAno()}
     <div class="tabs" role="tablist">${
       TRIMESTRES.map(x => `<button class="tab" role="tab"
         aria-selected="${x.id === estado.trimestre}" data-tri="${x.id}">
@@ -706,6 +735,7 @@ async function renderFaixa(){
       <div class="grade">${extras.map(cartao).join('')}</div>` : ''}
   `, [ {t:'Início', ir:'inicio'}, {t:f.nome} ]);
 
+  ligarAbasAno(renderFaixa);
   app.querySelectorAll('[data-tri]').forEach(b => {
     b.onclick = () => { estado.trimestre = +b.dataset.tri; renderFaixa(); };
   });
@@ -1021,9 +1051,9 @@ async function renderGrade(){
       </div>`, [ {t:'Início', ir:'inicio'}, {t:'Grade'} ]);
   }
 
-  const ciclo = us.filter(u => u.tipo === 'ciclo').sort((a,b) => a.numero - b.numero);
-  const extras = us.filter(u => u.tipo === 'extra');
-  const pendentes = us.filter(u => u.status !== 'aprovada').length;
+  const ciclo = us.filter(u => doAno(u) && u.tipo === 'ciclo').sort((a,b) => a.numero - b.numero);
+  const extras = us.filter(u => doAno(u) && u.tipo === 'extra');
+  const pendentes = us.filter(u => doAno(u) && u.status !== 'aprovada').length;
 
   const linha = u => {
     const rot = u.tipo === 'extra'
@@ -1066,8 +1096,10 @@ async function renderGrade(){
   moldura(`
     <p class="eyebrow">Ciclo permanente · sem ano fixo</p>
     <h1>Grade do ciclo</h1>
-    <p class="lede">Cada trimestre tem três blocos de quatro domingos e um domingo de
-      revisão. O Berçário usa o texto do primeiro domingo do bloco nas quatro semanas.</p>
+    <p class="lede">Três anos de 52 domingos. Como a permanência mais longa numa faixa
+      é de três anos, nenhuma criança repete conteúdo. Cada trimestre tem três blocos de
+      quatro domingos e uma revisão; o Berçário usa o texto do primeiro domingo do bloco.</p>
+    ${abasAno()}
     <div class="linha">
       ${estado.papel !== 'admin' ? '' : `<button class="btn gold" id="aprovar" ${pendentes ? '' : 'disabled'}>
         ${pendentes ? `Aprovar a grade (${pendentes} pendentes)` : 'Grade aprovada'}</button>`}
@@ -1075,6 +1107,7 @@ async function renderGrade(){
     </div>
     ${corpo}`, [ {t:'Início', ir:'inicio'}, {t:'Grade'} ]);
 
+  ligarAbasAno(renderGrade);
   app.querySelectorAll('[data-editar]').forEach(b => {
     b.onclick = () => abrirEdicao(b.dataset.editar, us);
   });
@@ -1491,8 +1524,8 @@ async function renderGerar(){
   const t = extrasAgora ? { id:0, tema:'Datas especiais', faixa:[0,0] }
                         : TRIMESTRES.find(x => x.id === alvo);
   const doTri = extrasAgora
-    ? us.filter(u => u.tipo === 'extra').sort((a,b) => (a.ordem||0) - (b.ordem||0))
-    : us.filter(u => u.tipo === 'ciclo'
+    ? us.filter(u => doAno(u) && u.tipo === 'extra').sort((a,b) => (a.ordem||0) - (b.ordem||0))
+    : us.filter(u => doAno(u) && u.tipo === 'ciclo'
         && u.numero >= t.faixa[0] && u.numero <= t.faixa[1]).sort((a,b) => a.numero - b.numero);
 
   const tarefas = [];
@@ -1510,6 +1543,7 @@ async function renderGerar(){
     <p class="lede">Cada lição é escrita e salva individualmente. Se a fila for
       interrompida, nada se perde: ao voltar, ela recomeça de onde parou.</p>
 
+    ${abasAno()}
     <div class="tabs" role="tablist">${
       TRIMESTRES.map(x => `<button class="tab" role="tab"
         aria-selected="${x.id === alvo}" data-tri="${x.id}">
@@ -1554,6 +1588,7 @@ async function renderGerar(){
       <pre id="registro" class="registro"></pre>
     </div>`, [ {t:'Início', ir:'inicio'}, {t:'Gerar'} ]);
 
+  ligarAbasAno(renderGerar);
   app.querySelectorAll('[data-tri]').forEach(b => {
     b.onclick = () => { estado.trimestre = +b.dataset.tri; renderGerar(); };
   });
@@ -1651,7 +1686,7 @@ function cabecalho(u, faixa, peca){
   const dom = u.tipo === 'extra'
     ? (EXTRAS.find(e => e.slug === u.extra_slug)?.nome || 'Data especial')
     : `Domingo ${pad(u.numero)}`;
-  return `<div class="cab-p"><span>${esc(faixa.nome)} · ${esc(dom)}</span>
+  return `<div class="cab-p"><span>${esc(faixa.nome)} · Ano ${u.ano || 1} · ${esc(dom)}</span>
           <span>${esc(peca)}</span></div>`;
 }
 const secao = (rot, txt) => txt
@@ -1760,7 +1795,7 @@ function imprimir(html){
 async function imprimirTrimestre(faixa, trimestre){
   const us = await carregarUnidades();
   const t = TRIMESTRES.find(x => x.id === trimestre);
-  let alvos = us.filter(u => u.tipo === 'ciclo'
+  let alvos = us.filter(u => doAno(u) && u.tipo === 'ciclo'
     && u.numero >= t.faixa[0] && u.numero <= t.faixa[1]).sort((a,b) => a.numero - b.numero);
   if (faixa.id === 1) alvos = alvos.filter(u => faixasDaUnidade(u).includes(1));
 
