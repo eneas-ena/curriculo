@@ -227,6 +227,33 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
 .porta .btn{width:100%;margin-top:12px;background:var(--gold);border-color:var(--gold);color:#2A2004;padding:13px}
 .porta .erro{color:#F2B8A2;font-size:13.5px;margin-top:12px;min-height:20px}
 
+/* ---------- tabela da grade ---------- */
+.tab-grade{width:100%;border-collapse:collapse;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tab-grade td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+.tab-grade tr:last-child td{border-bottom:0}
+.tab-grade tr.sub td{
+  background:#F4F7FA;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-soft);padding:8px 14px;
+}
+.tab-grade td.nu{font-family:var(--mono);font-size:12px;color:var(--f4);width:1%;white-space:nowrap;padding-top:13px}
+.tab-grade td.rr{font-family:var(--mono);font-size:12px;color:var(--ink-soft);white-space:nowrap;width:1%;padding-top:13px}
+.tab-grade td.aa{width:1%;white-space:nowrap;text-align:right}
+.tab-grade .tt{display:block;font-weight:600;font-size:14.5px;line-height:1.3}
+.tab-grade .vv{display:block;font-size:13px;color:var(--ink-soft);margin-top:2px;line-height:1.4}
+.tab-grade tr.edit td{background:#F9FBFD}
+.tab-grade tr.edit label{display:block;margin-bottom:9px;font-family:var(--mono);
+  font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+.tab-grade tr.edit input,.tab-grade tr.edit textarea{
+  display:block;width:100%;margin-top:4px;font:inherit;font-size:14.5px;
+  padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);
+  text-transform:none;letter-spacing:normal;
+}
+@media (max-width:640px){
+  .tab-grade td.rr{white-space:normal}
+  .tab-grade td,.tab-grade tr.sub td{padding-left:10px;padding-right:10px}
+}
+
 /* ---------- utilidades ---------- */
 .aviso{
   background:#FBF6E6;border:1px solid #E6D8A8;border-left:3px solid var(--gold);
@@ -621,18 +648,118 @@ async function enviarArte(materialId, file){
 }
 
 /* ---------- telas ainda por construir ---------- */
-function renderGrade(){
+async function renderGrade(){
+  moldura('<div class="carregando">Carregando a grade…</div>');
+  const us = await carregarUnidades();
+
+  if (!us.length){
+    return moldura(`
+      <h1>Grade do ciclo</h1>
+      <div class="vazio">
+        <p class="t">A grade ainda não foi carregada</p>
+        <p class="d">Rode o arquivo <strong>grade.sql</strong> no SQL Editor do
+           Supabase. Ele insere os 52 domingos e as 5 datas especiais.</p>
+      </div>`, [ {t:'Início', ir:'inicio'}, {t:'Grade'} ]);
+  }
+
+  const ciclo = us.filter(u => u.tipo === 'ciclo').sort((a,b) => a.numero - b.numero);
+  const extras = us.filter(u => u.tipo === 'extra');
+  const pendentes = us.filter(u => u.status !== 'aprovada').length;
+
+  const linha = u => {
+    const rot = u.tipo === 'extra'
+      ? (EXTRAS.find(e => e.slug === u.extra_slug)?.nome || 'Extra')
+      : pad(u.numero);
+    return `<tr data-u="${u.id}">
+      <td class="nu">${esc(rot)}</td>
+      <td><span class="tt">${esc(u.titulo)}</span>
+          <span class="vv">${esc(u.verdade_central || '')}</span></td>
+      <td class="rr">${esc(u.texto_biblico)}</td>
+      <td class="aa">
+        ${u.status === 'aprovada' ? '<span class="selo def">Aprovada</span>' : ''}
+        <button class="btn ghost sm" data-editar="${u.id}">Editar</button>
+      </td></tr>`;
+  };
+
+  let corpo = '';
+  TRIMESTRES.forEach(t => {
+    const doTri = ciclo.filter(u => u.trimestre_id === t.id);
+    if (!doTri.length) return;
+    let blocoAtual = null;
+    let linhas = '';
+    doTri.forEach(u => {
+      const bloco = (u.observacoes || '').split('·')[0].trim();
+      if (bloco !== blocoAtual){
+        blocoAtual = bloco;
+        linhas += `<tr class="sub"><td colspan="4">${esc(bloco)}</td></tr>`;
+      }
+      linhas += linha(u);
+    });
+    corpo += `<h2 style="margin:30px 0 10px">${pad(t.faixa[0])}–${pad(t.faixa[1])} · ${esc(t.tema)}</h2>
+      <table class="tab-grade"><tbody>${linhas}</tbody></table>`;
+  });
+
+  corpo += `<h2 style="margin:34px 0 10px">Datas especiais</h2>
+    <p style="color:var(--ink-soft);font-size:14px;margin:-6px 0 12px">
+      Geradas à parte. Substituem qualquer domingo quando você quiser.</p>
+    <table class="tab-grade"><tbody>${extras.map(linha).join('')}</tbody></table>`;
+
   moldura(`
-    <p class="eyebrow">Etapa 2</p>
-    <h1>Grade dos 52 domingos</h1>
-    <p class="lede">Aqui o app vai propor a distribuição dos textos bíblicos pelos
-      quatro trimestres, e você aprova ou troca antes de qualquer geração.</p>
-    <div class="vazio">
-      <p class="t">Próxima etapa</p>
-      <p class="d">Assim que o esqueleto estiver no ar e o schema rodado, montamos
-        esta tela e a proposta da grade.</p>
+    <p class="eyebrow">Ciclo permanente · sem ano fixo</p>
+    <h1>Grade do ciclo</h1>
+    <p class="lede">Cada trimestre tem três blocos de quatro domingos e um domingo de
+      revisão. O Berçário usa o texto do primeiro domingo do bloco nas quatro semanas.</p>
+    <div class="linha">
+      <button class="btn gold" id="aprovar" ${pendentes ? '' : 'disabled'}>
+        ${pendentes ? `Aprovar a grade (${pendentes} pendentes)` : 'Grade aprovada'}</button>
       <button class="btn ghost" data-ir="inicio">Voltar ao início</button>
-    </div>`, [ {t:'Início', ir:'inicio'}, {t:'Grade'} ]);
+    </div>
+    ${corpo}`, [ {t:'Início', ir:'inicio'}, {t:'Grade'} ]);
+
+  app.querySelectorAll('[data-editar]').forEach(b => {
+    b.onclick = () => abrirEdicao(b.dataset.editar, us);
+  });
+  const btnAp = $('#aprovar');
+  if (btnAp) btnAp.onclick = async () => {
+    btnAp.disabled = true; btnAp.textContent = 'Aprovando…';
+    await sb.from('unidades').update({ status:'aprovada' }).neq('status','aprovada');
+    estado.cache.unidades = null;
+    renderGrade();
+  };
+}
+
+function abrirEdicao(id, us){
+  const u = us.find(x => x.id === id);
+  const tr = app.querySelector(`tr[data-u="${id}"]`);
+  if (!u || !tr || tr.nextElementSibling?.classList.contains('edit')) return;
+
+  const ed = document.createElement('tr');
+  ed.className = 'edit';
+  ed.innerHTML = `<td colspan="4">
+    <label>Título<input id="e-tit" value="${esc(u.titulo)}"></label>
+    <label>Texto bíblico<input id="e-ref" value="${esc(u.texto_biblico)}"
+      placeholder="Ex.: Marcos 4.35-41"></label>
+    <label>Verdade central<textarea id="e-vc" rows="2">${esc(u.verdade_central || '')}</textarea></label>
+    <div class="linha" style="margin:10px 0 0">
+      <button class="btn sm" id="e-salvar">Salvar</button>
+      <button class="btn ghost sm" id="e-cancelar">Cancelar</button>
+    </div></td>`;
+  tr.after(ed);
+
+  ed.querySelector('#e-cancelar').onclick = () => ed.remove();
+  ed.querySelector('#e-salvar').onclick = async () => {
+    const btn = ed.querySelector('#e-salvar');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    const { error } = await sb.from('unidades').update({
+      titulo: ed.querySelector('#e-tit').value.trim(),
+      texto_biblico: ed.querySelector('#e-ref').value.trim(),
+      verdade_central: ed.querySelector('#e-vc').value.trim()
+    }).eq('id', id);
+    if (error){ alert('Não foi possível salvar: ' + error.message); btn.disabled = false; btn.textContent = 'Salvar'; return; }
+    estado.cache.unidades = null;
+    renderGrade();
+  };
+  ed.querySelector('#e-tit').focus();
 }
 
 function renderMoldes(){
