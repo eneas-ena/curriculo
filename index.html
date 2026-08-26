@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rede de Crianças — Igreja Vidas</title>
+<meta name="theme-color" content="#0F1B33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   REDE DE CRIANÇAS
+   A cor carrega a informação: cada faixa é um estrato de profundidade,
+   do mais claro (Berçário, perceber) ao mais fundo (Juniores, convicção).
+   =================================================================== */
+:root{
+  --f1:#DCE6F0; --f2:#A9C2DC; --f3:#6E93BA; --f4:#38598C; --f5:#0F1B33;
+  --f1-ink:#0F1B33; --f2-ink:#0F1B33; --f3-ink:#FFFFFF; --f4-ink:#FFFFFF; --f5-ink:#FFFFFF;
+
+  --paper:#E9EDF2;
+  --surface:#FFFFFF;
+  --ink:#16223A;
+  --ink-soft:#5A6982;
+  --line:#CFD8E3;
+  --gold:#C9A227;
+  --gold-deep:#9C7C15;
+  --rust:#A8552F;
+
+  --display:'Cormorant Garamond',Georgia,serif;
+  --body:'Karla',system-ui,-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+
+  --r:10px;
+  --shadow:0 1px 2px rgba(15,27,51,.06), 0 8px 24px -12px rgba(15,27,51,.18);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:var(--body); font-size:16px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- estrutura ---------- */
+.topbar{
+  position:sticky;top:0;z-index:20;
+  display:flex;align-items:center;gap:14px;
+  padding:12px 20px;
+  background:var(--f5);color:#fff;
+  border-bottom:2px solid var(--gold);
+}
+.topbar .mark{
+  font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.02em;
+  line-height:1.1;
+}
+.topbar .mark small{
+  display:block;font-family:var(--mono);font-size:9.5px;font-weight:500;
+  letter-spacing:.22em;text-transform:uppercase;color:#9FB3CE;margin-top:2px;
+}
+.topbar .spacer{flex:1}
+.chip{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  padding:5px 10px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#CBD8E8;
+  background:transparent;
+}
+.chip.gold{border-color:var(--gold);color:var(--gold)}
+.wrap{max-width:1060px;margin:0 auto;padding:26px 20px 72px}
+
+.crumb{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-soft);margin-bottom:18px;
+}
+.crumb button{background:none;border:0;padding:0;color:var(--ink-soft);text-decoration:underline;text-underline-offset:3px}
+.crumb button:hover{color:var(--ink)}
+.crumb span.sep{opacity:.45}
+
+h1{font-family:var(--display);font-weight:600;font-size:clamp(28px,5vw,40px);line-height:1.1;margin:0 0 6px}
+h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line-height:1.2}
+.lede{color:var(--ink-soft);max-width:60ch;margin:0 0 26px}
+.eyebrow{
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-soft);margin:0 0 10px;
+}
+
+/* ---------- assinatura: os cinco estratos ---------- */
+.strata{border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--line)}
+.stratum{
+  display:grid;grid-template-columns:64px 1fr auto;align-items:center;gap:18px;
+  width:100%;text-align:left;border:0;border-bottom:1px solid rgba(15,27,51,.10);
+  padding:20px 22px;transition:padding .18s ease, filter .18s ease;
+}
+.stratum:last-child{border-bottom:0}
+.stratum:hover,.stratum:focus-visible{padding-top:28px;padding-bottom:28px;filter:saturate(1.12)}
+.stratum .verbo{
+  font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  writing-mode:vertical-rl;transform:rotate(180deg);opacity:.72;justify-self:center;
+}
+.stratum .nome{font-family:var(--display);font-size:26px;font-weight:600;line-height:1.15}
+.stratum .idade{font-size:13.5px;opacity:.78;margin-top:1px}
+.stratum .pergunta{font-size:13px;opacity:.66;font-style:italic;margin-top:6px;display:none}
+.stratum:hover .pergunta,.stratum:focus-visible .pergunta{display:block}
+.stratum .prog{font-family:var(--mono);font-size:12px;letter-spacing:.06em;opacity:.8;text-align:right;white-space:nowrap}
+.s1{background:var(--f1);color:var(--f1-ink)}
+.s2{background:var(--f2);color:var(--f2-ink)}
+.s3{background:var(--f3);color:var(--f3-ink)}
+.s4{background:var(--f4);color:var(--f4-ink)}
+.s5{background:var(--f5);color:var(--f5-ink)}
+
+/* ---------- trimestres ---------- */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 22px}
+.tab{
+  background:transparent;border:1px solid var(--line);border-radius:999px;
+  padding:8px 15px;font-size:13.5px;font-weight:500;color:var(--ink-soft);
+}
+.tab[aria-selected="true"]{background:var(--f5);border-color:var(--f5);color:#fff}
+.tab .n{font-family:var(--mono);font-size:11px;opacity:.7;margin-right:6px}
+
+/* ---------- grade de domingos ---------- */
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:12px}
+.card{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:15px 16px 14px;text-align:left;width:100%;
+  display:flex;flex-direction:column;gap:7px;min-height:132px;
+  transition:border-color .15s ease, transform .15s ease;
+}
+.card:hover{border-color:var(--f4);transform:translateY(-2px)}
+.card .num{
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--ink-soft);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.card .tit{font-family:var(--display);font-size:19px;font-weight:600;line-height:1.2}
+.card .ref{font-family:var(--mono);font-size:11.5px;color:var(--f4)}
+.card .vc{font-size:12.5px;color:var(--ink-soft);line-height:1.45;flex:1}
+.card.extra{border-style:dashed;border-color:var(--gold)}
+.card.extra .num{color:var(--gold-deep)}
+
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.dot.pendente{background:var(--line)}
+.dot.gerada{background:var(--f3)}
+.dot.aprovada{background:var(--gold)}
+.dot.publicada{background:#2E7D5B}
+
+/* ---------- ficha da lição ---------- */
+.ficha{display:grid;grid-template-columns:1fr 300px;gap:22px;align-items:start}
+@media (max-width:860px){.ficha{grid-template-columns:1fr}}
+.bloco{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:20px 22px;margin-bottom:14px;
+}
+.bloco h3{
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-soft);margin:0 0 10px;font-weight:600;
+  display:flex;align-items:center;gap:9px;
+}
+.bloco h3::before{
+  content:attr(data-n);font-size:10px;color:var(--gold-deep);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;
+}
+.bloco p{margin:0 0 10px;white-space:pre-wrap}
+.bloco p:last-child{margin-bottom:0}
+.bloco ul{margin:0;padding-left:19px}
+.bloco li{margin-bottom:5px}
+.destaque{
+  border-left:3px solid var(--gold);background:#FBF6E6;
+  padding:14px 16px;border-radius:0 var(--r) var(--r) 0;margin-bottom:14px;
+}
+.destaque .rot{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-deep)}
+.destaque .txt{font-family:var(--display);font-size:20px;line-height:1.35;margin-top:3px}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:14px}
+.meta dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);padding-top:3px}
+.meta dd{margin:0}
+
+/* ---------- materiais ---------- */
+.mat{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:12px;background:var(--surface)}
+.mat .cab{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.mat .cab .tipo{font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:#fff;background:var(--f4);padding:3px 7px;border-radius:3px}
+.mat .cab .tit{font-weight:600;font-size:14px;flex:1;line-height:1.25}
+.mat .prev{background:#fff;padding:12px;display:flex;align-items:center;justify-content:center;min-height:130px}
+.mat .prev svg,.mat .prev img{max-width:100%;max-height:230px;height:auto}
+.mat .pe{padding:11px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line)}
+.selo{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;padding:3px 8px;border-radius:999px}
+.selo.prov{color:var(--rust);border:1px solid var(--rust)}
+.selo.def{color:#2E7D5B;border:1px solid #2E7D5B}
+
+/* ---------- botões ---------- */
+.btn{
+  background:var(--f5);color:#fff;border:1px solid var(--f5);border-radius:7px;
+  padding:9px 16px;font-size:14px;font-weight:600;
+}
+.btn:hover{background:#1B2C4C}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{background:#fff;border-color:var(--f4)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#2A2004}
+.btn.gold:hover{background:var(--gold-deep);color:#fff}
+.btn.sm{padding:6px 11px;font-size:12.5px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* ---------- estados vazios ---------- */
+.vazio{
+  border:1px dashed var(--line);border-radius:var(--r);background:rgba(255,255,255,.55);
+  padding:38px 26px;text-align:center;
+}
+.vazio .t{font-family:var(--display);font-size:22px;font-weight:600;margin-bottom:5px}
+.vazio .d{color:var(--ink-soft);max-width:46ch;margin:0 auto 16px;font-size:14.5px}
+
+/* ---------- PIN ---------- */
+.porta{min-height:100dvh;display:grid;place-items:center;padding:24px;background:var(--f5)}
+.porta .caixa{width:100%;max-width:372px;text-align:center;color:#fff}
+.porta .selo-abre{
+  font-family:var(--mono);font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold)
+}
+.porta h1{color:#fff;margin:12px 0 4px}
+.porta .sub{color:#9FB3CE;font-size:14px;margin-bottom:26px}
+.porta input{
+  width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.24);
+  color:#fff;border-radius:9px;padding:15px;text-align:center;
+  font-family:var(--mono);font-size:26px;letter-spacing:.5em;text-indent:.5em;
+}
+.porta input:focus{outline:2px solid var(--gold);outline-offset:2px}
+.porta .btn{width:100%;margin-top:12px;background:var(--gold);border-color:var(--gold);color:#2A2004;padding:13px}
+.porta .erro{color:#F2B8A2;font-size:13.5px;margin-top:12px;min-height:20px}
+
+/* ---------- utilidades ---------- */
+.aviso{
+  background:#FBF6E6;border:1px solid #E6D8A8;border-left:3px solid var(--gold);
+  border-radius:0 var(--r) var(--r) 0;padding:14px 16px;margin-bottom:20px;font-size:14px;
+}
+.aviso strong{display:block;margin-bottom:3px}
+.linha{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+.carregando{text-align:center;padding:56px;color:var(--ink-soft);font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+.oculto{display:none!important}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+/* ===================================================================
+   CONFIGURAÇÃO — preencha aqui e faça o commit.
+   =================================================================== */
+const CONFIG = {
+  // Projeto Supabase deste app (rode o schema.sql nele antes)
+  SUPABASE_URL: 'https://qldioxaanyxfogffhouu.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_n6c8glnXYeRQU8Ue9nVKuQ_twv-UnwZ',
+
+  // Fonte do texto bíblico NAA — o projeto do InterTextus.
+  // Ainda falta acertar o nome da tabela e das colunas.
+  BIBLIA: {
+    URL: '',
+    KEY: '',
+    TABELA: '',
+    COLUNAS: { livro:'', capitulo:'', versiculo:'', texto:'', versao:'' }
+  },
+
+  // Portaria por PIN. Não é segurança criptográfica: é para o material
+  // certo chegar à turma certa e ninguém disparar geração por engano.
+  PIN_ADMIN: '1988',
+  PIN_FAIXA: { bercario:'1111', maternal:'2222', jardim:'3333', primarios:'4444', juniores:'5555' }
+};
+
+/* =================================================================== */
+const FAIXAS = [
+  { id:1, slug:'bercario',  nome:'Berçário',                   idade:'0 a 1 ano e 11 meses', verbo:'Perceber',
+    pergunta:'O que estou experimentando?', duracao:'30 a 40 min' },
+  { id:2, slug:'maternal',  nome:'Maternal',                   idade:'2 a 3 anos',           verbo:'Conhecer',
+    pergunta:'O que é isso?',               duracao:'40 a 50 min' },
+  { id:3, slug:'jardim',    nome:'Jardim',                     idade:'4 a 5 anos',           verbo:'Compreender',
+    pergunta:'Por que aconteceu?',          duracao:'50 a 60 min' },
+  { id:4, slug:'primarios', nome:'Primários',                  idade:'6 a 8 anos',           verbo:'Aplicar',
+    pergunta:'O que isso me ensina?',       duracao:'60 a 70 min' },
+  { id:5, slug:'juniores',  nome:'Juniores / Pré-adolescentes',idade:'9 a 11 anos',          verbo:'Convicção',
+    pergunta:'O que eu penso e faço diante disso?', duracao:'60 a 75 min' }
+];
+
+const TRIMESTRES = [
+  { id:1, tema:'Conhecendo Deus',          faixa:[1,13]  },
+  { id:2, tema:'Conhecendo Jesus',         faixa:[14,26] },
+  { id:3, tema:'Vivendo como discípulos',  faixa:[27,39] },
+  { id:4, tema:'Servindo e anunciando',    faixa:[40,52] }
+];
+
+const EXTRAS = [
+  { slug:'pascoa',   nome:'Páscoa' },
+  { slug:'natal',    nome:'Natal' },
+  { slug:'maes',     nome:'Dia das Mães' },
+  { slug:'pais',     nome:'Dia dos Pais' },
+  { slug:'criancas', nome:'Dia das Crianças' }
+];
+
+const CAMPOS_FICHA = [
+  ['acolhimento','Acolhimento','09'],
+  ['introducao','Introdução / quebra-gelo','10'],
+  ['ensino_biblico','Ensino bíblico','11'],
+  ['atividade_fixacao','Atividade de fixação','12'],
+  ['aplicacao_pratica','Aplicação prática','13'],
+  ['oracao','Oração','14']
+];
+
+/* =================================================================== */
+let sb = null;
+const configurado = () => CONFIG.SUPABASE_URL.includes('supabase.co') && !CONFIG.SUPABASE_URL.includes('SEU-PROJETO');
+if (configurado()) sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+
+const estado = {
+  papel: localStorage.getItem('rc_papel') || null,     // 'admin' | 'professor'
+  faixaPin: localStorage.getItem('rc_faixa') || null,  // slug, quando professor
+  tela: 'inicio',
+  faixa: null,
+  trimestre: 1,
+  licaoId: null,
+  cache: { unidades:null, progresso:null }
+};
+
+const $ = s => document.querySelector(s);
+const app = $('#app');
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const faixaPor = slug => FAIXAS.find(f => f.slug === slug);
+
+/* ---------- portaria ---------- */
+function renderPorta(){
+  app.innerHTML = `
+  <div class="porta"><div class="caixa">
+    <div class="selo-abre">Igreja Vidas · Departamento Infantil</div>
+    <h1>Rede de Crianças</h1>
+    <p class="sub">Informe seu PIN para entrar.</p>
+    <input id="pin" type="password" inputmode="numeric" maxlength="8"
+           autocomplete="off" aria-label="PIN de acesso">
+    <button class="btn" id="entrar">Entrar</button>
+    <p class="erro" id="erro" role="alert"></p>
+  </div></div>`;
+
+  const entrar = () => {
+    const v = $('#pin').value.trim();
+    if (v === CONFIG.PIN_ADMIN){
+      estado.papel = 'admin'; estado.faixaPin = null;
+      localStorage.setItem('rc_papel','admin'); localStorage.removeItem('rc_faixa');
+      return ir('inicio');
+    }
+    const achou = Object.entries(CONFIG.PIN_FAIXA).find(([,p]) => p === v);
+    if (achou){
+      estado.papel = 'professor'; estado.faixaPin = achou[0];
+      localStorage.setItem('rc_papel','professor'); localStorage.setItem('rc_faixa',achou[0]);
+      estado.faixa = achou[0];
+      return ir('faixa');
+    }
+    $('#erro').textContent = 'PIN não reconhecido. Confira com a liderança do departamento.';
+    $('#pin').value = ''; $('#pin').focus();
+  };
+  $('#entrar').onclick = entrar;
+  $('#pin').onkeydown = e => { if (e.key === 'Enter') entrar(); };
+  $('#pin').focus();
+}
+
+/* ---------- moldura ---------- */
+function moldura(conteudo, migalhas = []){
+  const papel = estado.papel === 'admin'
+    ? '<span class="chip gold">Administração</span>'
+    : `<span class="chip">Professor · ${esc(faixaPor(estado.faixaPin)?.nome || '')}</span>`;
+  const crumb = migalhas.length ? `<nav class="crumb">${
+      migalhas.map((m,i) => i === migalhas.length-1
+        ? `<span>${esc(m.t)}</span>`
+        : `<button data-ir="${m.ir}" data-arg="${m.arg||''}">${esc(m.t)}</button><span class="sep">/</span>`
+      ).join('')}</nav>` : '';
+  app.innerHTML = `
+    <header class="topbar">
+      <div class="mark">Rede de Crianças<small>Igreja Vidas</small></div>
+      <div class="spacer"></div>${papel}
+      <button class="chip" id="sair">Sair</button>
+    </header>
+    <main class="wrap">${crumb}${conteudo}</main>`;
+  $('#sair').onclick = () => {
+    localStorage.removeItem('rc_papel'); localStorage.removeItem('rc_faixa');
+    estado.papel = null; estado.faixaPin = null; renderPorta();
+  };
+  app.querySelectorAll('[data-ir]').forEach(b => {
+    b.onclick = () => ir(b.dataset.ir, b.dataset.arg || null);
+  });
+}
+
+/* ---------- tela: início (os cinco estratos) ---------- */
+async function renderInicio(){
+  const prog = await carregarProgresso();
+  const estratos = FAIXAS.map(f => {
+    const p = prog[f.id] || { geradas:0, total:52 };
+    return `<button class="stratum s${f.id}" data-ir="faixa" data-arg="${f.slug}">
+      <span class="verbo">${esc(f.verbo)}</span>
+      <span>
+        <span class="nome">${esc(f.nome)}</span>
+        <span class="idade">${esc(f.idade)}</span>
+        <span class="pergunta">“${esc(f.pergunta)}”</span>
+      </span>
+      <span class="prog">${pad(p.geradas)} <span style="opacity:.5">/ ${p.total}</span></span>
+    </button>`;
+  }).join('');
+
+  moldura(`
+    <p class="eyebrow">Uma verdade, cinco profundidades</p>
+    <h1>Trilha de formação bíblica</h1>
+    <p class="lede">O mesmo texto bíblico percorre as cinco faixas. O que muda é a
+      profundidade, a linguagem, a metodologia e o resultado esperado.</p>
+    <div class="strata">${estratos}</div>
+    ${estado.papel === 'admin' ? `
+      <div class="linha" style="margin-top:26px">
+        <button class="btn" data-ir="grade">Grade dos 52 domingos</button>
+        <button class="btn ghost" data-ir="moldes">Banco de moldes</button>
+      </div>` : ''}
+  `);
+}
+
+/* ---------- tela: faixa ---------- */
+async function renderFaixa(){
+  const f = faixaPor(estado.faixa);
+  if (!f) return ir('inicio');
+  const unidades = await carregarUnidades();
+  const t = TRIMESTRES.find(t => t.id === estado.trimestre);
+
+  const doTri = unidades.filter(u =>
+    u.tipo === 'ciclo' && u.numero >= t.faixa[0] && u.numero <= t.faixa[1]);
+  const extras = unidades.filter(u => u.tipo === 'extra');
+
+  const cartao = u => {
+    const l = (u.licoes || []).find(x => x.faixa_id === f.id);
+    const st = l?.status || 'pendente';
+    const rot = u.tipo === 'extra'
+      ? (EXTRAS.find(e => e.slug === u.extra_slug)?.nome || 'Extra').toUpperCase()
+      : `Domingo ${pad(u.numero)}`;
+    return `<button class="card ${u.tipo === 'extra' ? 'extra' : ''}"
+              data-ir="licao" data-arg="${u.id}">
+      <span class="num">${esc(rot)}<span class="dot ${st}" title="${st}"></span></span>
+      <span class="tit">${esc(l?.tema || u.titulo)}</span>
+      <span class="ref">${esc(u.texto_biblico)}</span>
+      <span class="vc">${esc(u.verdade_central || '')}</span>
+    </button>`;
+  };
+
+  const grade = doTri.length
+    ? `<div class="grade">${doTri.map(cartao).join('')}</div>`
+    : vazioGrade();
+
+  moldura(`
+    <div style="background:var(--f${f.id});color:var(--f${f.id}-ink);
+                border-radius:var(--r);padding:22px 24px;margin-bottom:24px">
+      <p class="eyebrow" style="color:inherit;opacity:.7">${esc(f.verbo)} · ${esc(f.duracao)}</p>
+      <h1 style="margin:0">${esc(f.nome)}</h1>
+      <p style="margin:4px 0 0;opacity:.82">${esc(f.idade)} — “${esc(f.pergunta)}”</p>
+    </div>
+    <div class="tabs" role="tablist">${
+      TRIMESTRES.map(x => `<button class="tab" role="tab"
+        aria-selected="${x.id === estado.trimestre}" data-tri="${x.id}">
+        <span class="n">${pad(x.faixa[0])}–${pad(x.faixa[1])}</span>${esc(x.tema)}</button>`).join('')}
+    </div>
+    ${grade}
+    ${extras.length ? `
+      <p class="eyebrow" style="margin-top:34px">Datas especiais · substituem qualquer domingo</p>
+      <div class="grade">${extras.map(cartao).join('')}</div>` : ''}
+  `, [ {t:'Início', ir:'inicio'}, {t:f.nome} ]);
+
+  app.querySelectorAll('[data-tri]').forEach(b => {
+    b.onclick = () => { estado.trimestre = +b.dataset.tri; renderFaixa(); };
+  });
+}
+
+function vazioGrade(){
+  return estado.papel === 'admin'
+    ? `<div class="vazio">
+         <p class="t">A grade ainda não foi definida</p>
+         <p class="d">Antes de gerar qualquer lição é preciso fechar quais textos
+            bíblicos ocupam os 52 domingos. Essa é a próxima etapa.</p>
+         <button class="btn gold" data-ir="grade">Montar a grade</button>
+       </div>`
+    : `<div class="vazio">
+         <p class="t">Nada publicado neste trimestre ainda</p>
+         <p class="d">O material aparece aqui assim que a liderança do
+            departamento o publicar.</p>
+       </div>`;
+}
+
+/* ---------- tela: lição ---------- */
+async function renderLicao(){
+  moldura('<div class="carregando">Abrindo lição…</div>');
+  const f = faixaPor(estado.faixa);
+  const { data: u } = await sb.from('unidades').select('*').eq('id', estado.licaoId).single();
+  const { data: ls } = await sb.from('licoes').select('*')
+    .eq('unidade_id', estado.licaoId).eq('faixa_id', f.id);
+  const l = ls?.[0];
+
+  const migalhas = [ {t:'Início', ir:'inicio'}, {t:f.nome, ir:'faixa', arg:f.slug},
+                     {t: u?.titulo || 'Lição'} ];
+
+  if (!l || l.status === 'pendente'){
+    return moldura(`
+      <h1>${esc(u?.titulo || '')}</h1>
+      <p class="lede">${esc(u?.texto_biblico || '')}</p>
+      <div class="vazio">
+        <p class="t">Lição ainda não gerada</p>
+        <p class="d">Esta unidade já está na grade, mas o material desta faixa
+           ainda não foi produzido.</p>
+        ${estado.papel === 'admin'
+          ? '<button class="btn gold" disabled>Gerar lição — etapa 3</button>' : ''}
+      </div>`, migalhas);
+  }
+
+  const mats = await carregarMateriais(l.id);
+  const rec = Array.isArray(l.recursos_didaticos) ? l.recursos_didaticos : [];
+  const ori = Array.isArray(l.orientacoes_professor) ? l.orientacoes_professor : [];
+
+  const corpo = CAMPOS_FICHA
+    .filter(([k]) => l[k])
+    .map(([k,rot,n]) => `<div class="bloco"><h3 data-n="${n}">${esc(rot)}</h3>
+        <p>${esc(l[k])}</p></div>`).join('');
+
+  moldura(`
+    <p class="eyebrow">${esc(f.nome)} · ${esc(f.verbo)}</p>
+    <h1>${esc(l.tema || u.titulo)}</h1>
+    <p class="lede">${esc(l.texto_biblico || u.texto_biblico)}</p>
+
+    <div class="ficha">
+      <div>
+        <div class="destaque">
+          <div class="rot">Verdade central</div>
+          <div class="txt">${esc(l.verdade_central || u.verdade_central || '')}</div>
+        </div>
+        <div class="bloco">
+          <h3 data-n="05">Objetivo e versículo</h3>
+          <dl class="meta">
+            <dt>Objetivo</dt><dd>${esc(l.objetivo || '')}</dd>
+            <dt>Versículo</dt><dd>${esc(l.versiculo_texto || '')}
+              ${l.versiculo_ref ? `<em style="color:var(--ink-soft)"> — ${esc(l.versiculo_ref)} (NAA)</em>` : ''}</dd>
+            <dt>Duração</dt><dd>${esc(l.duracao || f.duracao)}</dd>
+          </dl>
+        </div>
+        ${l.chave_metodologica ? `<div class="destaque">
+          <div class="rot">Chave metodológica</div>
+          <div class="txt" style="font-size:17px">${esc(l.chave_metodologica)}</div></div>` : ''}
+        ${l.preparacao_professor ? `<div class="bloco"><h3 data-n="08">Preparação do professor</h3>
+          <p>${esc(l.preparacao_professor)}</p></div>` : ''}
+        ${corpo}
+        ${l.desafio_semana ? `<div class="bloco"><h3 data-n="15">Desafio da semana</h3>
+          <p>${esc(l.desafio_semana)}</p></div>` : ''}
+        ${l.desafio_familia ? `<div class="bloco" style="border-color:var(--gold)">
+          <h3 data-n="16">Desafio em família</h3><p>${esc(l.desafio_familia)}</p></div>` : ''}
+        ${ori.length ? `<div class="bloco"><h3 data-n="17">Orientações ao professor</h3>
+          <ul>${ori.map(o => `<li>${esc(o)}</li>`).join('')}</ul></div>` : ''}
+      </div>
+
+      <aside>
+        <div class="bloco">
+          <h3 data-n="07">Recursos didáticos</h3>
+          ${rec.length ? `<ul>${rec.map(r => `<li>${esc(r)}</li>`).join('')}</ul>`
+                       : '<p style="color:var(--ink-soft)">Nenhum listado.</p>'}
+        </div>
+        <p class="eyebrow">Materiais para imprimir</p>
+        ${mats.length ? mats.map(cartaoMaterial).join('')
+          : `<div class="vazio" style="padding:24px 16px">
+               <p class="d" style="margin:0">Os materiais são criados junto com a
+                  lição, na etapa de geração.</p></div>`}
+        <button class="btn ghost" style="width:100%;margin-top:8px" disabled>
+          Baixar tudo em PDF — etapa 4</button>
+      </aside>
+    </div>`, migalhas);
+
+  app.querySelectorAll('[data-copiar]').forEach(b => {
+    b.onclick = async () => {
+      await navigator.clipboard.writeText(b.dataset.copiar);
+      b.textContent = 'Prompt copiado'; setTimeout(() => b.textContent = 'Copiar prompt', 1800);
+    };
+  });
+  app.querySelectorAll('[data-enviar]').forEach(inp => {
+    inp.onchange = e => enviarArte(inp.dataset.enviar, e.target.files[0]);
+  });
+}
+
+function cartaoMaterial(m){
+  const def = m.imagem_status === 'definitivo' && m.imagem_url;
+  return `<div class="mat">
+    <div class="cab">
+      <span class="tipo">${esc(m.tipo)}</span>
+      <span class="tit">${esc(m.titulo)}</span>
+      <span class="selo ${def ? 'def' : 'prov'}">${def ? 'Definitivo' : 'Provisório'}</span>
+    </div>
+    <div class="prev">${def ? `<img src="${esc(m.imagem_url)}" alt="${esc(m.titulo)}">`
+                            : (m.svg || '<span style="color:var(--ink-soft);font-size:13px">sem prévia</span>')}</div>
+    ${m.instrucoes ? `<div style="padding:10px 14px;font-size:13px;color:var(--ink-soft)">${esc(m.instrucoes)}</div>` : ''}
+    ${estado.papel === 'admin' ? `<div class="pe">
+      ${m.prompt_imagem ? `<button class="btn ghost sm" data-copiar="${esc(m.prompt_imagem)}">Copiar prompt</button>` : ''}
+      <label class="btn ghost sm" style="cursor:pointer">
+        ${def ? 'Trocar arte' : 'Enviar arte final'}
+        <input type="file" accept="image/png,image/jpeg,image/webp"
+               class="oculto" data-enviar="${m.id}">
+      </label>
+    </div>` : ''}
+  </div>`;
+}
+
+async function enviarArte(materialId, file){
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+  const caminho = `materiais/${materialId}.${ext}`;
+  const { error } = await sb.storage.from('rede-criancas')
+    .upload(caminho, file, { upsert:true, contentType:file.type });
+  if (error){ alert('Não foi possível enviar a arte: ' + error.message); return; }
+  const { data:{ publicUrl } } = sb.storage.from('rede-criancas').getPublicUrl(caminho);
+  await sb.from('materiais').update({
+    imagem_url: publicUrl + '?v=' + Date.now(),
+    imagem_status: 'definitivo',
+    atualizado_em: new Date().toISOString()
+  }).eq('id', materialId);
+  renderLicao();
+}
+
+/* ---------- telas ainda por construir ---------- */
+function renderGrade(){
+  moldura(`
+    <p class="eyebrow">Etapa 2</p>
+    <h1>Grade dos 52 domingos</h1>
+    <p class="lede">Aqui o app vai propor a distribuição dos textos bíblicos pelos
+      quatro trimestres, e você aprova ou troca antes de qualquer geração.</p>
+    <div class="vazio">
+      <p class="t">Próxima etapa</p>
+      <p class="d">Assim que o esqueleto estiver no ar e o schema rodado, montamos
+        esta tela e a proposta da grade.</p>
+      <button class="btn ghost" data-ir="inicio">Voltar ao início</button>
+    </div>`, [ {t:'Início', ir:'inicio'}, {t:'Grade'} ]);
+}
+
+function renderMoldes(){
+  moldura(`
+    <p class="eyebrow">Banco institucional de recursos</p>
+    <h1>Moldes</h1>
+    <p class="lede">Peças de desenho reutilizáveis que o gerador combina para montar
+      atividades: figuras, molduras, tabuleiros, cartões.</p>
+    <div class="vazio">
+      <p class="t">Banco vazio</p>
+      <p class="d">Os moldes entram junto com o motor de geração, na etapa 3.</p>
+      <button class="btn ghost" data-ir="inicio">Voltar ao início</button>
+    </div>`, [ {t:'Início', ir:'inicio'}, {t:'Moldes'} ]);
+}
+
+/* ---------- dados ---------- */
+async function carregarUnidades(){
+  if (estado.cache.unidades) return estado.cache.unidades;
+  const { data, error } = await sb.from('unidades')
+    .select('*, licoes(id, faixa_id, status, tema)')
+    .order('tipo').order('numero', { nullsFirst:false });
+  if (error){ console.error(error); return []; }
+  estado.cache.unidades = data || [];
+  return estado.cache.unidades;
+}
+
+async function carregarProgresso(){
+  const mapa = {};
+  FAIXAS.forEach(f => mapa[f.id] = { geradas:0, total:52 });
+  const { data } = await sb.from('v_progresso_faixa').select('*');
+  (data || []).forEach(r => {
+    mapa[r.faixa_id] = {
+      geradas: estado.papel === 'admin' ? r.geradas : r.publicadas,
+      total: r.total_ciclo || 52
+    };
+  });
+  return mapa;
+}
+
+async function carregarMateriais(licaoId){
+  const { data } = await sb.from('materiais').select('*').eq('licao_id', licaoId).order('ordem');
+  return data || [];
+}
+
+/* ---------- roteador ---------- */
+function ir(tela, arg){
+  estado.tela = tela;
+  if (tela === 'faixa' && arg) estado.faixa = arg;
+  if (tela === 'licao' && arg) estado.licaoId = arg;
+  render();
+}
+
+async function render(){
+  if (!estado.papel) return renderPorta();
+
+  if (!configurado()){
+    return moldura(`
+      <div class="aviso"><strong>Falta configurar o Supabase</strong>
+        Abra o index.html, preencha SUPABASE_URL e SUPABASE_KEY no bloco CONFIG
+        e faça o commit. Rode o schema.sql no projeto antes.</div>
+      <h1>Rede de Crianças</h1>
+      <p class="lede">O app está no ar, mas ainda não sabe onde buscar o material.</p>`);
+  }
+
+  if (estado.papel === 'professor'){
+    estado.faixa = estado.faixaPin;
+    if (!['faixa','licao'].includes(estado.tela)) estado.tela = 'faixa';
+  }
+
+  try{
+    if (estado.tela === 'inicio')  return await renderInicio();
+    if (estado.tela === 'faixa')   return await renderFaixa();
+    if (estado.tela === 'licao')   return await renderLicao();
+    if (estado.tela === 'grade')   return renderGrade();
+    if (estado.tela === 'moldes')  return renderMoldes();
+    return await renderInicio();
+  }catch(e){
+    console.error(e);
+    moldura(`<div class="aviso"><strong>Não foi possível carregar</strong>
+      ${esc(e.message || e)}</div>
+      <button class="btn ghost" data-ir="inicio">Tentar de novo</button>`);
+  }
+}
+
+/* ---------- manifesto PWA embutido ---------- */
+const manifesto = {
+  name:'Rede de Crianças', short_name:'Rede', start_url:'.', display:'standalone',
+  background_color:'#0F1B33', theme_color:'#0F1B33',
+  icons:[{ src:'data:image/svg+xml;base64,' + btoa(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+       <rect width="512" height="512" fill="#0F1B33"/>
+       <g fill="none" stroke="#C9A227" stroke-width="26" stroke-linecap="round">
+         <path d="M136 190h240M156 256h200M176 322h160"/></g></svg>`),
+    sizes:'512x512', type:'image/svg+xml', purpose:'any' }]
+};
+const linkMan = document.createElement('link');
+linkMan.rel = 'manifest';
+linkMan.href = URL.createObjectURL(new Blob([JSON.stringify(manifesto)], { type:'application/manifest+json' }));
+document.head.appendChild(linkMan);
+
+render();
+</script>
+</body>
+</html>
