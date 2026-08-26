@@ -275,6 +275,13 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
   max-height:340px;overflow:auto;white-space:pre-wrap;margin:0;
 }
 
+#falha{
+  position:fixed;left:0;right:0;bottom:0;z-index:99;
+  background:var(--rust);color:#fff;padding:12px 18px;cursor:pointer;
+  font-family:var(--mono);font-size:12px;line-height:1.5;
+  padding-bottom:calc(12px + env(safe-area-inset-bottom));
+}
+
 /* ---------- utilidades ---------- */
 .aviso{
   background:#FBF6E6;border:1px solid #E6D8A8;border-left:3px solid var(--gold);
@@ -316,7 +323,7 @@ const CONFIG = {
   PIN_FAIXA: { bercario:'1111', maternal:'2222', jardim:'3333', primarios:'4444', juniores:'5555' },
 
   // Motor de geração (Cloudflare Worker — veja worker.js)
-  WORKER_URL: 'curriculo-criancas.eneaspr.workers.dev',
+  WORKER_URL: 'https://curriculo-criancas.eneaspr.workers.dev',
   MODELO: 'claude-sonnet-4-6'
 };
 
@@ -667,7 +674,7 @@ async function renderLicao(){
                      {t: u?.titulo || 'Lição'} ];
 
   if (!l || l.status === 'pendente'){
-    return moldura(`
+    moldura(`
       <h1>${esc(u?.titulo || '')}</h1>
       <p class="lede">${esc(u?.texto_biblico || '')}</p>
       <div class="vazio">
@@ -1392,6 +1399,23 @@ async function render(){
       <button class="btn ghost" data-ir="inicio">Tentar de novo</button>`);
   }
 }
+
+/* ---------- nada de falha silenciosa ----------
+   Qualquer erro não tratado vira uma faixa visível no rodapé, para não
+   voltar a acontecer de um botão simplesmente não responder. */
+function mostrarFalha(msg){
+  let f = document.getElementById('falha');
+  if (!f){
+    f = document.createElement('div');
+    f.id = 'falha';
+    f.onclick = () => f.remove();
+    document.body.appendChild(f);
+  }
+  f.textContent = '⚠ ' + msg + '  (toque para fechar)';
+}
+window.addEventListener('error', e => mostrarFalha(e.message || 'erro desconhecido'));
+window.addEventListener('unhandledrejection', e =>
+  mostrarFalha(e.reason?.message || String(e.reason || 'promessa rejeitada')));
 
 /* ---------- manifesto PWA embutido ---------- */
 /* Os caminhos precisam ser absolutos: o manifesto é servido como Blob,
