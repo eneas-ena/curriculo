@@ -449,6 +449,8 @@ Caixa das Grandes Perguntas. Trate dúvidas reais com honestidade, sem respostas
     materiais:'Folha de estudo O.P.A.; estudo de caso impresso; linha do tempo, mapa ou quiz para recortar.'
   }
 };
+/* =================================================================== */
+let sb = null;
 const configurado = () => CONFIG.SUPABASE_URL.includes('supabase.co') && !CONFIG.SUPABASE_URL.includes('SEU-PROJETO');
 if (configurado()) sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 const sbBiblia = createClient(CONFIG.BIBLIA.URL, CONFIG.BIBLIA.KEY,
