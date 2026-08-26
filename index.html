@@ -283,6 +283,57 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
   padding-bottom:calc(12px + env(safe-area-inset-bottom));
 }
 
+/* ===================================================================
+   IMPRESSÃO — o navegador gera o PDF. No Mac: PDF → Salvar como PDF.
+   =================================================================== */
+#imprimir{display:none}
+
+@media print{
+  @page{ size:A4 portrait; margin:14mm 15mm; }
+  body{background:#fff;color:#000;font-size:11.5pt}
+  body > *{display:none !important}
+  #imprimir{display:block !important}
+
+  .pagina{page-break-after:always;break-after:page}
+  .pagina:last-child{page-break-after:auto;break-after:auto}
+
+  .cab-p{
+    display:flex;justify-content:space-between;align-items:baseline;
+    border-bottom:1.5pt solid #000;padding-bottom:4pt;margin-bottom:14pt;
+    font-size:8.5pt;letter-spacing:.09em;text-transform:uppercase;
+  }
+  .pagina h1{
+    font-family:'Cormorant Garamond',Georgia,serif;font-size:22pt;
+    line-height:1.15;margin:0 0 3pt;
+  }
+  .pagina .ref-p{font-size:10pt;font-style:italic;margin:0 0 14pt}
+  .vc-p{border:1.2pt solid #000;padding:8pt 11pt;margin-bottom:14pt}
+  .vc-p .r{font-size:8pt;letter-spacing:.14em;text-transform:uppercase}
+  .vc-p .t{font-family:'Cormorant Garamond',Georgia,serif;font-size:15pt;line-height:1.3}
+  .sec-p{margin-bottom:11pt;page-break-inside:avoid;break-inside:avoid}
+  .sec-p h2{
+    font-size:8.5pt;letter-spacing:.13em;text-transform:uppercase;
+    margin:0 0 3pt;padding-bottom:2pt;border-bottom:.6pt solid #999;
+  }
+  .sec-p p{margin:0;white-space:pre-wrap;line-height:1.45}
+  .sec-p ul{margin:3pt 0 0;padding-left:14pt}
+  .grade-p{display:grid;grid-template-columns:auto 1fr;gap:3pt 10pt;font-size:10.5pt}
+  .grade-p dt{font-size:8pt;letter-spacing:.1em;text-transform:uppercase;padding-top:2pt}
+  .grade-p dd{margin:0}
+  .arte-p{text-align:center;margin:0}
+  .arte-p svg,.arte-p img{max-width:100%;max-height:225mm;height:auto}
+  .rod-p{
+    position:running(rodape);margin-top:14pt;padding-top:5pt;border-top:.6pt solid #999;
+    font-size:8pt;text-align:center;
+  }
+  .cartao-p{
+    border:1.2pt dashed #000;padding:12pt 14pt;margin-bottom:10pt;
+    page-break-inside:avoid;break-inside:avoid;
+  }
+  .linhas-p{margin-top:10pt}
+  .linhas-p div{border-bottom:.8pt solid #000;height:9mm}
+}
+
 /* ---------- utilidades ---------- */
 .aviso{
   background:#FBF6E6;border:1px solid #E6D8A8;border-left:3px solid var(--gold);
@@ -296,6 +347,7 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
 </head>
 <body>
 <div id="app"></div>
+<div id="imprimir"></div>
 
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -637,6 +689,9 @@ async function renderFaixa(){
         <span class="n">${pad(x.faixa[0])}–${pad(x.faixa[1])}</span>${esc(x.tema)}</button>`).join('')}
     </div>
     ${grade}
+    <div class="linha" style="margin:18px 0 0">
+      <button class="btn ghost" id="imp-tri">Imprimir o trimestre inteiro</button>
+    </div>
     ${extras.length ? `
       <p class="eyebrow" style="margin-top:34px">Datas especiais · substituem qualquer domingo</p>
       <div class="grade">${extras.map(cartao).join('')}</div>` : ''}
@@ -645,6 +700,13 @@ async function renderFaixa(){
   app.querySelectorAll('[data-tri]').forEach(b => {
     b.onclick = () => { estado.trimestre = +b.dataset.tri; renderFaixa(); };
   });
+  const btnTri = $('#imp-tri');
+  if (btnTri) btnTri.onclick = async () => {
+    btnTri.disabled = true; btnTri.textContent = 'Montando…';
+    try{ await imprimirTrimestre(f, estado.trimestre); }
+    catch(e){ alert('Não foi possível montar: ' + e.message); }
+    btnTri.disabled = false; btnTri.textContent = 'Imprimir o trimestre inteiro';
+  };
 }
 
 function vazioGrade(){
@@ -770,8 +832,20 @@ async function renderLicao(){
         ${mats.length && estado.papel === 'admin'
           ? '<button class="btn ghost sm" id="refazer-mats" style="width:100%;margin-top:4px">Refazer os materiais</button>' : ''}
         <pre id="registro-mats" class="registro oculto" style="margin-top:10px"></pre>
-        <button class="btn ghost" style="width:100%;margin-top:8px" disabled>
-          Baixar tudo em PDF — etapa 4</button>
+        <div class="bloco" style="margin-top:14px">
+          <h3 data-n="↓">Imprimir</h3>
+          <button class="btn gold" id="imp-tudo" style="width:100%;margin-bottom:8px">
+            Imprimir a lição completa</button>
+          <div class="linha" style="margin:0">
+            <button class="btn ghost sm" data-imp="ficha">Só a ficha</button>
+            <button class="btn ghost sm" data-imp="aluno">Folha do aluno</button>
+            <button class="btn ghost sm" data-imp="mats">Materiais</button>
+            <button class="btn ghost sm" data-imp="familia">Cartões</button>
+          </div>
+          <p style="font-size:12.5px;color:var(--ink-soft);margin:10px 0 0">
+            Para gerar PDF, escolha <strong>PDF → Salvar como PDF</strong> na
+            janela de impressão.</p>
+        </div>
         ${estado.papel === 'admin' ? `
           <div class="bloco" style="margin-top:14px">
             <h3 data-n="${pad(l.versao || 1)}">Situação da lição</h3>
@@ -788,6 +862,17 @@ async function renderLicao(){
           </div>` : ''}
       </aside>
     </div>`, migalhas);
+
+  const tudo = { ficha:true, aluno:true, mats:true, familia:true };
+  const btnTudo = $('#imp-tudo');
+  if (btnTudo) btnTudo.onclick = () => imprimir(montarLicao(u, f, l, mats, tudo));
+  app.querySelectorAll('[data-imp]').forEach(b => {
+    b.onclick = () => {
+      const so = { ficha:false, aluno:false, mats:false, familia:false };
+      so[b.dataset.imp] = true;
+      imprimir(montarLicao(u, f, l, mats, so));
+    };
+  });
 
   const btnMats = $('#refazer-mats');
   if (btnMats) btnMats.onclick = async () => {
@@ -1461,6 +1546,149 @@ async function regerarLicao(licaoId, unidadeId, faixaId){
   }catch(e){
     alert('Falhou: ' + e.message); renderLicao();
   }
+}
+
+/* ===================================================================
+   MONTAGEM DAS PEÇAS IMPRESSAS
+   =================================================================== */
+const RODAPE = 'Igreja Vidas — Departamento Infantil · Rede de Crianças';
+const CREDITO = 'Texto bíblico: Bíblia Livre (domínio público).';
+
+function cabecalho(u, faixa, peca){
+  const dom = u.tipo === 'extra'
+    ? (EXTRAS.find(e => e.slug === u.extra_slug)?.nome || 'Data especial')
+    : `Domingo ${pad(u.numero)}`;
+  return `<div class="cab-p"><span>${esc(faixa.nome)} · ${esc(dom)}</span>
+          <span>${esc(peca)}</span></div>`;
+}
+const secao = (rot, txt) => txt
+  ? `<div class="sec-p"><h2>${esc(rot)}</h2><p>${esc(txt)}</p></div>` : '';
+
+/* 1. Ficha do professor — os 17 campos */
+function pecaFicha(u, faixa, l){
+  const rec = Array.isArray(l.recursos_didaticos) ? l.recursos_didaticos : [];
+  const ori = Array.isArray(l.orientacoes_professor) ? l.orientacoes_professor : [];
+  return `<article class="pagina">
+    ${cabecalho(u, faixa, 'Ficha do professor')}
+    <h1>${esc(l.tema || u.titulo)}</h1>
+    <p class="ref-p">${esc(l.texto_biblico || u.texto_biblico)}</p>
+    <div class="vc-p"><div class="r">Verdade central</div>
+      <div class="t">${esc(l.verdade_central || u.verdade_central || '')}</div></div>
+    <div class="sec-p"><dl class="grade-p">
+      <dt>Objetivo</dt><dd>${esc(l.objetivo || '')}</dd>
+      <dt>Versículo</dt><dd>${esc(l.versiculo_texto || '')} <em>${esc(l.versiculo_ref || '')}</em></dd>
+      <dt>Duração</dt><dd>${esc(l.duracao || faixa.duracao)}</dd>
+      ${l.chave_metodologica ? `<dt>Chave</dt><dd>${esc(l.chave_metodologica)}</dd>` : ''}
+      ${rec.length ? `<dt>Recursos</dt><dd>${esc(rec.join(' · '))}</dd>` : ''}
+    </dl></div>
+    ${secao('Preparação do professor', l.preparacao_professor)}
+    ${secao('Acolhimento', l.acolhimento)}
+    ${secao('Introdução', l.introducao)}
+    ${secao('Ensino bíblico', l.ensino_biblico)}
+    ${secao('Atividade de fixação', l.atividade_fixacao)}
+    ${secao('Aplicação prática', l.aplicacao_pratica)}
+    ${secao('Oração', l.oracao)}
+    ${secao('Desafio da semana', l.desafio_semana)}
+    ${ori.length ? `<div class="sec-p"><h2>Orientações ao professor</h2>
+       <ul>${ori.map(o => `<li>${esc(o)}</li>`).join('')}</ul></div>` : ''}
+    <div class="rod-p">${esc(RODAPE)} · ${esc(CREDITO)}</div>
+  </article>`;
+}
+
+/* 2. Folha do aluno */
+function pecaAluno(u, faixa, l){
+  const linhas = faixa.id <= 2 ? 0 : (faixa.id === 3 ? 4 : 7);
+  return `<article class="pagina">
+    ${cabecalho(u, faixa, 'Folha do aluno')}
+    <h1>${esc(l.tema || u.titulo)}</h1>
+    <p class="ref-p">${esc(l.texto_biblico || u.texto_biblico)}</p>
+    <div class="vc-p"><div class="r">Versículo para guardar no coração</div>
+      <div class="t">${esc(l.versiculo_texto || '')}</div>
+      <div class="r" style="margin-top:4pt">${esc(l.versiculo_ref || '')}</div></div>
+    ${secao('O que aprendi hoje', l.verdade_central || u.verdade_central)}
+    ${secao('Meu desafio da semana', l.desafio_semana)}
+    ${linhas ? `<div class="sec-p"><h2>Escreva ou desenhe o que Deus falou com você</h2>
+      <div class="linhas-p">${'<div></div>'.repeat(linhas)}</div></div>`
+     : `<div class="sec-p"><h2>Desenhe o que você aprendeu</h2>
+        <div style="border:1.2pt solid #000;height:95mm"></div></div>`}
+    <div class="rod-p">Nome: ______________________________ · ${esc(RODAPE)}</div>
+  </article>`;
+}
+
+/* 3. Materiais — arte definitiva se houver, senão o SVG provisório */
+function pecaMaterial(u, faixa, m){
+  const arte = (m.imagem_status === 'definitivo' && m.imagem_url)
+    ? `<img src="${esc(m.imagem_url)}" alt="${esc(m.titulo)}">`
+    : (m.svg || '');
+  if (!arte) return '';
+  return `<article class="pagina">
+    ${cabecalho(u, faixa, m.titulo)}
+    <div class="arte-p">${arte}</div>
+    <div class="rod-p">${esc(m.instrucoes || '')} · ${esc(RODAPE)}</div>
+  </article>`;
+}
+
+/* 4. Cartão do Desafio em Família — três por página, para recortar */
+function pecaFamilia(u, faixa, l){
+  if (!l.desafio_familia) return '';
+  const cartao = `<div class="cartao-p">
+      <div style="font-size:8pt;letter-spacing:.13em;text-transform:uppercase">
+        Desafio em família · ${esc(faixa.nome)}</div>
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:14pt;margin:3pt 0 5pt">
+        ${esc(l.tema || u.titulo)}</div>
+      <div style="line-height:1.45">${esc(l.desafio_familia)}</div>
+      <div style="font-size:8pt;margin-top:7pt">${esc(l.versiculo_ref || '')} · ${esc(RODAPE)}</div>
+    </div>`;
+  return `<article class="pagina">
+    ${cabecalho(u, faixa, 'Desafio em família')}
+    ${cartao.repeat(3)}
+  </article>`;
+}
+
+function montarLicao(u, faixa, l, mats, partes){
+  let h = '';
+  if (partes.ficha)   h += pecaFicha(u, faixa, l);
+  if (partes.aluno)   h += pecaAluno(u, faixa, l);
+  if (partes.mats)    h += (mats || []).map(m => pecaMaterial(u, faixa, m)).join('');
+  if (partes.familia) h += pecaFamilia(u, faixa, l);
+  return h;
+}
+
+function imprimir(html){
+  if (!html.trim()) return alert('Não há nada para imprimir nesta seleção.');
+  const alvo = document.getElementById('imprimir');
+  alvo.innerHTML = html;
+  const limpar = () => { alvo.innerHTML = ''; window.removeEventListener('afterprint', limpar); };
+  window.addEventListener('afterprint', limpar);
+  setTimeout(() => window.print(), 120);   // deixa as imagens assentarem
+}
+
+/* Trimestre inteiro de uma faixa, na ordem dos domingos. */
+async function imprimirTrimestre(faixa, trimestre){
+  const us = await carregarUnidades();
+  const t = TRIMESTRES.find(x => x.id === trimestre);
+  let alvos = us.filter(u => u.tipo === 'ciclo'
+    && u.numero >= t.faixa[0] && u.numero <= t.faixa[1]).sort((a,b) => a.numero - b.numero);
+  if (faixa.id === 1) alvos = alvos.filter(u => faixasDaUnidade(u).includes(1));
+
+  const ids = alvos.map(u => u.id);
+  const { data: licoes } = await sb.from('licoes').select('*')
+    .in('unidade_id', ids).eq('faixa_id', faixa.id);
+  const visiveis = (licoes || []).filter(l =>
+    estado.papel === 'admin' ? l.status !== 'pendente' : l.status === 'publicada');
+  if (!visiveis.length) return alert('Nenhuma lição disponível neste trimestre ainda.');
+
+  const { data: mats } = await sb.from('materiais').select('*')
+    .in('licao_id', visiveis.map(l => l.id)).order('ordem');
+
+  let html = '';
+  for (const u of alvos){
+    const l = visiveis.find(x => x.unidade_id === u.id);
+    if (!l) continue;
+    html += montarLicao(u, faixa, l, (mats || []).filter(m => m.licao_id === l.id),
+                        { ficha:true, aluno:true, mats:true, familia:true });
+  }
+  imprimir(html);
 }
 
 /* ---------- roteador ---------- */
