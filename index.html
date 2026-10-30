@@ -339,6 +339,30 @@ h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 4px;line
   padding-bottom:calc(12px + env(safe-area-inset-bottom));
 }
 
+/* ---------- modo escuro (sol/lua) — só na tela; a impressão continua clara ---------- */
+@media screen{
+  html[data-theme="dark"]{
+    --paper:#0B1426; --surface:#15213A; --ink:#E6ECF5; --ink-soft:#9FB0C8; --line:#2A3A57;
+    --f1:#2E3F5C; --f1-ink:#E6ECF5; --f2:#3B5478; --f2-ink:#E6ECF5;
+  }
+  html[data-theme="dark"] .btn.ghost:hover{background:var(--surface)}
+  html[data-theme="dark"] input, html[data-theme="dark"] textarea, html[data-theme="dark"] select{background:var(--surface);color:var(--ink);border-color:var(--line)}
+}
+@media (max-width:440px){
+  .topbar{gap:6px;padding-left:calc(12px + env(safe-area-inset-left));padding-right:calc(12px + env(safe-area-inset-right))}
+  .topbar .mark{font-size:17px}
+  .topbar .chip{padding:5px 7px;letter-spacing:.04em;font-size:10px}
+  .topbar .brasao{width:28px;height:28px}
+}
+.porta .abas{display:flex;gap:6px;margin-bottom:14px}
+.porta .abas button{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#CBD8E8;font-weight:600}
+.porta .abas button[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:#2A2004}
+.porta label{display:block;text-align:left;color:#9FB3CE;font-size:13px;margin:10px 0 4px}
+.porta .rodape{display:flex;justify-content:space-between;align-items:center;margin-top:22px;color:#9FB3CE;font-size:12.5px}
+.porta .rodape button{background:none;border:1px solid rgba(255,255,255,.25);border-radius:999px;color:#CBD8E8;padding:6px 10px}
+#aviso-versao{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:10000;max-width:480px;margin:0 auto;background:var(--gold);color:#2A2004;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 8px 24px rgba(0,0,0,.3);font-weight:600}
+#aviso-versao button{background:#0F1B33;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;white-space:nowrap}
+
 /* ===================================================================
    IMPRESSÃO — o navegador gera o PDF. No Mac: PDF → Salvar como PDF.
    =================================================================== */
@@ -427,12 +451,14 @@ const CONFIG = {
     VERSAO_ID: 2
   },
 
-  // Portaria por PIN. Não é segurança criptográfica: é para o material
-  // certo chegar à turma certa e ninguém disparar geração por engano.
-  PIN_ADMIN: '1988',
-  PIN_FAIXA: { bercario:'1111', maternal:'2222', jardim:'3333', primarios:'4444', juniores:'5555' },
-  // Vê todas as faixas e imprime; não gera, não aprova, não edita.
-  PIN_SUPERVISAO: '7777',
+  // Versão do app (aparece no canto da tela)
+  VERSAO: '2.0.0',
+
+  // Entrada (v2.0): acabaram os PINs.
+  //  - Administrador: e-mail e senha do Bispo (gera, aprova, edita).
+  //  - Equipe: conta comum, só vê e imprime todas as turmas.
+  //    A senha da equipe fica guardada no Supabase, nunca aqui.
+  EMAIL_EQUIPE: 'rede-criancas@igrejavidas.app',
 
   // Motor de geração (Cloudflare Worker — veja worker.js)
   WORKER_URL: 'https://curriculo-criancas.eneaspr.workers.dev',
@@ -589,13 +615,14 @@ Caixa das Grandes Perguntas. Trate dúvidas reais com honestidade, sem respostas
 /* =================================================================== */
 let sb = null;
 const configurado = () => CONFIG.SUPABASE_URL.includes('supabase.co') && !CONFIG.SUPABASE_URL.includes('SEU-PROJETO');
-if (configurado()) sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, { db: { schema: 'curriculo' } });
+if (configurado()) sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, { db: { schema: 'curriculo' }, auth: { storageKey: 'rede-auth', persistSession: true, autoRefreshToken: true } });
 const sbBiblia = createClient(CONFIG.BIBLIA.URL, CONFIG.BIBLIA.KEY,
-                              { db:{ schema: CONFIG.BIBLIA.SCHEMA } });
+                              { db:{ schema: CONFIG.BIBLIA.SCHEMA },
+                                auth:{ storageKey:'rc-biblia', persistSession:false, autoRefreshToken:false } });
 
 const estado = {
-  papel: localStorage.getItem('rc_papel') || null,     // 'admin' | 'professor'
-  faixaPin: localStorage.getItem('rc_faixa') || null,  // slug, quando professor
+  papel: null,      // 'admin' | 'supervisao' (equipe) — vem do login
+  faixaPin: null,
   tela: 'inicio',
   faixa: null,
   ano: +(localStorage.getItem('rc_ano') || 1),
@@ -612,52 +639,99 @@ const pad = n => String(n).padStart(2,'0');
 const faixaPor = slug => FAIXAS.find(f => f.slug === slug);
 
 /* ---------- portaria ---------- */
-function renderPorta(){
+let portaAba = 'equipe';
+function renderPorta(msg){
+  const equipe = portaAba === 'equipe';
   app.innerHTML = `
   <div class="porta"><div class="caixa">
     <img class="brasao-grande" src="icone-512.png" alt="">
     <div class="selo-abre">Igreja Vidas · Departamento Infantil</div>
     <h1>Rede de Crianças</h1>
-    <p class="sub">Informe seu PIN para entrar.</p>
-    <input id="pin" type="password" inputmode="numeric" maxlength="8"
-           autocomplete="off" aria-label="PIN de acesso">
+    <p class="sub">${equipe ? 'Digite a senha da equipe para ver e imprimir o material.' : 'Entre com o e-mail e a senha de administrador.'}</p>
+    <div class="abas" role="group" aria-label="Tipo de entrada">
+      <button data-aba="equipe" aria-pressed="${equipe}">Equipe</button>
+      <button data-aba="admin" aria-pressed="${!equipe}">Administrador</button>
+    </div>
+    ${equipe ? '' : `<label for="email">E-mail</label>
+    <input id="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" style="letter-spacing:normal;text-indent:0;font-size:16px;font-family:var(--body)">`}
+    <label for="senha">Senha</label>
+    <input id="senha" type="password" autocomplete="current-password" style="letter-spacing:normal;text-indent:0;font-size:16px;font-family:var(--body)">
     <button class="btn" id="entrar">Entrar</button>
-    <p class="erro" id="erro" role="alert"></p>
+    <p class="erro" id="erro" role="alert">${esc(msg || '')}</p>
+    <div class="rodape"><span>v${CONFIG.VERSAO} · <button data-atualizar>Atualizar app</button></span>
+      <button data-tema aria-label="Alternar claro e escuro">${temaAtual() === 'dark' ? '☀️' : '🌙'}</button></div>
   </div></div>`;
 
-  const entrar = () => {
-    const v = $('#pin').value.trim();
-    if (v === CONFIG.PIN_ADMIN){
-      estado.papel = 'admin'; estado.faixaPin = null;
-      localStorage.setItem('rc_papel','admin'); localStorage.removeItem('rc_faixa');
-      return ir('inicio');
+  app.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { portaAba = b.dataset.aba; renderPorta(); });
+  const entrar = async () => {
+    const email = equipe ? CONFIG.EMAIL_EQUIPE : ($('#email').value || '').trim();
+    const senha = $('#senha').value;
+    if (!email || !senha){ $('#erro').textContent = equipe ? 'Digite a senha.' : 'Preencha o e-mail e a senha.'; return; }
+    const btn = $('#entrar'); btn.disabled = true; btn.textContent = 'Entrando…'; $('#erro').textContent = '';
+    try{
+      const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+      if (error) throw new Error(/invalid/i.test(error.message) ? 'Senha incorreta.' : error.message);
+      const papel = await lerPapel();
+      if (!papel){ await sb.auth.signOut(); throw new Error('Esta conta não tem acesso à Rede de Crianças.'); }
+      estado.papel = papel; estado.tela = 'inicio';
+      render();
+    }catch(e){
+      btn.disabled = false; btn.textContent = 'Entrar';
+      $('#erro').textContent = e.message || 'Não foi possível entrar.';
     }
-    if (v === CONFIG.PIN_SUPERVISAO){
-      estado.papel = 'supervisao'; estado.faixaPin = null;
-      localStorage.setItem('rc_papel','supervisao'); localStorage.removeItem('rc_faixa');
-      return ir('inicio');
-    }
-    const achou = Object.entries(CONFIG.PIN_FAIXA).find(([,p]) => p === v);
-    if (achou){
-      estado.papel = 'professor'; estado.faixaPin = achou[0];
-      localStorage.setItem('rc_papel','professor'); localStorage.setItem('rc_faixa',achou[0]);
-      estado.faixa = achou[0];
-      return ir('faixa');
-    }
-    $('#erro').textContent = 'PIN não reconhecido. Confira com a liderança do departamento.';
-    $('#pin').value = ''; $('#pin').focus();
   };
   $('#entrar').onclick = entrar;
-  $('#pin').onkeydown = e => { if (e.key === 'Enter') entrar(); };
-  $('#pin').focus();
+  $('#senha').onkeydown = e => { if (e.key === 'Enter') entrar(); };
+  const em = $('#email'); if (em) em.onkeydown = e => { if (e.key === 'Enter') $('#senha').focus(); };
+  (em || $('#senha')).focus();
 }
+
+/* Papel de quem está logado, conferido no banco: 'admin', 'supervisao' (equipe) ou null */
+async function lerPapel(){
+  const { data, error } = await sb.rpc('cur_papel');
+  if (error) throw new Error('Não consegui conferir o acesso (' + error.message + ').');
+  return data === 'admin' ? 'admin' : data === 'leitor' ? 'supervisao' : null;
+}
+
+/* ---------- tema (sol/lua) ---------- */
+function temaAtual(){ return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'; }
+function aplicarTema(t){
+  document.documentElement.dataset.theme = t;
+  try{ localStorage.setItem('rc_tema', t); }catch(e){}
+}
+(function(){ let t = null; try{ t = localStorage.getItem('rc_tema'); }catch(e){}
+  aplicarTema(t === 'dark' ? 'dark' : 'light'); })();
+
+/* ---------- atualização do app ---------- */
+async function atualizarAgora(){
+  try{ if ('serviceWorker' in navigator){ const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister())); } }catch(e){}
+  try{ if (window.caches){ const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } }catch(e){}
+  location.replace(location.href.split('#')[0].split('?')[0] + '?v=' + Date.now());
+}
+async function verificarVersao(){
+  try{
+    const r = await fetch(location.href.split('#')[0].split('?')[0] + '?nc=' + Date.now(), { cache:'no-store' });
+    if (!r.ok) return;
+    const m = (await r.text()).match(/VERSAO: '([^']+)'/);
+    if (!m || m[1] === CONFIG.VERSAO || document.getElementById('aviso-versao')) return;
+    const d = document.createElement('div');
+    d.id = 'aviso-versao'; d.setAttribute('role','status');
+    d.innerHTML = `<span>Nova versão disponível (v${esc(m[1])})</span><button type="button">Atualizar agora</button>`;
+    d.querySelector('button').onclick = atualizarAgora;
+    document.body.appendChild(d);
+  }catch(e){}
+}
+document.addEventListener('click', ev => {
+  if (ev.target.closest('[data-atualizar]')) return atualizarAgora();
+  if (ev.target.closest('[data-tema]')){ aplicarTema(temaAtual() === 'dark' ? 'light' : 'dark'); render(); }
+});
 
 /* ---------- moldura ---------- */
 function moldura(conteudo, migalhas = []){
   const papel = estado.papel === 'admin'
     ? '<span class="chip gold">Administração</span>'
     : estado.papel === 'supervisao'
-    ? '<span class="chip">Supervisão</span>'
+    ? '<span class="chip">Equipe</span>'
     : `<span class="chip">Professor · ${esc(faixaPor(estado.faixaPin)?.nome || '')}</span>`;
   const crumb = migalhas.length ? `<nav class="crumb">${
       migalhas.map((m,i) => i === migalhas.length-1
@@ -669,11 +743,13 @@ function moldura(conteudo, migalhas = []){
       <img class="brasao" src="icone-192.png" alt="">
       <div class="mark">Rede de Crianças<small>Igreja Vidas</small></div>
       <div class="spacer"></div>${papel}
+      <button class="chip" data-tema aria-label="Alternar claro e escuro">${temaAtual() === 'dark' ? '☀️' : '🌙'}</button>
+      <button class="chip" data-atualizar title="Atualizar app">⟳</button>
       <button class="chip" id="sair">Sair</button>
     </header>
     <main class="wrap">${crumb}${conteudo}</main>`;
-  $('#sair').onclick = () => {
-    localStorage.removeItem('rc_papel'); localStorage.removeItem('rc_faixa');
+  $('#sair').onclick = async () => {
+    try{ await sb.auth.signOut(); }catch(e){}
     estado.papel = null; estado.faixaPin = null; renderPorta();
   };
   app.querySelectorAll('[data-ir]').forEach(b => {
@@ -1441,10 +1517,11 @@ function motorPronto(){
 
 /* --- chamada ao motor --- */
 async function chamarIA(system, prompt, maxTokens){
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) throw new Error('Sua sessão terminou. Saia e entre de novo como administrador.');
   const r = await fetch(CONFIG.WORKER_URL, {
-    method:'POST', headers:{ 'Content-Type':'application/json' },
-    body: JSON.stringify({ pin: CONFIG.PIN_ADMIN, system, prompt,
-                           max_tokens: maxTokens, model: CONFIG.MODELO })
+    method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + session.access_token },
+    body: JSON.stringify({ system, prompt, max_tokens: maxTokens, model: CONFIG.MODELO })
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.erro || `Motor de geração respondeu ${r.status}.`);
@@ -2069,8 +2146,23 @@ linkMan.rel = 'manifest';
 linkMan.href = URL.createObjectURL(new Blob([JSON.stringify(manifesto)], { type:'application/manifest+json' }));
 document.head.appendChild(linkMan);
 
-render();
+/* Abertura: se já houver login guardado, confere no banco o papel dele */
+async function iniciar(){
+  try{ localStorage.removeItem('rc_papel'); localStorage.removeItem('rc_faixa'); }catch(e){}  // restos dos PINs
+  if (sb){
+    try{
+      const { data:{ session } } = await sb.auth.getSession();
+      if (session) estado.papel = await lerPapel();
+      if (session && !estado.papel) await sb.auth.signOut();
+    }catch(e){ estado.papel = null; }
+  }
+  render();
+}
+iniciar();
+setTimeout(verificarVersao, 3000);
+setInterval(verificarVersao, 30 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) verificarVersao(); });
 </script>
-<div id="versao-app" style="position:fixed;right:12px;bottom:12px;font:600 12px/1 system-ui,sans-serif;color:#C9A227;background:#0F1B33;border:1px solid #C9A227;padding:6px 10px;border-radius:999px;z-index:9999;pointer-events:none">v1.3 · 05/10</div>
+<div id="versao-app" style="position:fixed;right:12px;bottom:12px;font:600 12px/1 system-ui,sans-serif;color:#C9A227;background:#0F1B33;border:1px solid #C9A227;padding:6px 10px;border-radius:999px;z-index:9999;pointer-events:none">v2.0.0</div>
 </body>
 </html>
